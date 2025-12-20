@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # 1. Database (Bắt buộc dùng PostGIS vì Backend có lưu tọa độ bản đồ)
+  db:
+    image: postgis/postgis:16-3.4-alpine
+    container_name: smartrental_db
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=123456
+      - POSTGRES_DB=smart_rental_db
+      # Cho phép kết nối local dễ dàng (Dev only)
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - smartrental-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Giao diện quản lý Database (pgAdmin 4) - Tùy chọn để xem dữ liệu
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: smartrental_pgadmin
+    restart: always
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: admin
+    ports:
+      - "5050:80"
+    depends_on:
+      - db
+    networks:
+      - smartrental-network
+
+  # 3. Backend API (Java Spring Boot)
+  backend:
+    # Trỏ vào thư mục chứa code Java (Sửa tên nếu thư mục bạn khác)
+    build: ./smart-rental-backend
+    container_name: smartrental_backend
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # Kết nối DB qua tên service 'db'
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://db:5432/smart_rental_db?preferQueryMode=simple
+      - SPRING_DATASOURCE_USERNAME=postgres
+      - SPRING_DATASOURCE_PASSWORD=123456
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      
+      # Cấu hình JWT & Cloudinary (Dựa trên code backend của bạn)
+      - JWT_SECRET=KhanNguyenSmartRentalSystemSecretKey2025GenerativeAIProject
+      - CLOUDINARY_CLOUD_NAME=dfyrnocnr
+      - CLOUDINARY_API_KEY=448443126664466
+      - CLOUDINARY_API_SECRET=M8lZ0g_OPg4eLH0qh2BC-zMRaxQ
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - smartrental-network
+
+  # 4. Frontend Web (ReactJS Admin/Landlord)
+  web:
+    # Trỏ vào thư mục chứa code React
+    build: ./smart-rental-web
+    container_name: smartrental_web
+    restart: always
+    ports:
+      - "3000:80" # Truy cập web tại http://localhost:3000
+    depends_on:
+      - backend
+    networks:
+      - smartrental-network
+
+volumes:
+  postgres_data:
+
+networks:
+  smartrental-network:
+    driver: bridge

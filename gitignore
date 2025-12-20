@@ -1,0 +1,21 @@
+# --- FRONTEND (React) ---
+node_modules/
+dist/
+build/
+.env
+.DS_Store
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- BACKEND (Java/Spring Boot) ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+*.class
+
+# --- IDE (Cấu hình máy cá nhân) ---
+.idea/
+.vscode/
+*.iml
+*.log
