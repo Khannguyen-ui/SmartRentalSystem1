@@ -5,7 +5,8 @@ import {
   HomeOutlined, 
   CheckCircleOutlined, 
   UserOutlined, 
-  DatabaseOutlined
+  DatabaseOutlined,
+  ClockCircleOutlined
 } from '@ant-design/icons';
 import { useNavigate, useLocation } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
@@ -31,7 +32,7 @@ const Sidebar = () => {
   const landlordItems = [
     { key: '/landlord/create-room', icon: <HomeOutlined />, label: 'Đăng phòng mới' },
     { key: '/landlord/rooms', icon: <DashboardOutlined />, label: 'Phòng của tôi' },
-    
+    { key: '/landlord/appointments', icon: <ClockCircleOutlined />, label: 'Quản lý Lịch hẹn' },
   ];
 
   return (

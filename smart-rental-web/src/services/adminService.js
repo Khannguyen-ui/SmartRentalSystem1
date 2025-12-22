@@ -1,29 +1,23 @@
 import axiosClient from "../config/axiosClient";
 
 const adminService = {
-  // Lấy danh sách phòng chờ duyệt [cite: 622]
-  // Backend chưa có API riêng cho getPendingRooms public ra Controller, 
-  // ta dùng API search hoặc filter nếu backend hỗ trợ. 
-  // Tạm thời giả định bạn sẽ dùng endpoint search với status=PENDING
-  getPendingRooms: () => {
-    // Lưu ý: Cần đảm bảo Backend RoomController có hỗ trợ filter status
-    // Nếu chưa, hãy dùng API get all và filter phía client tạm thời
-    return axiosClient.get("/rooms/search?status=PENDING"); 
-  },
+  // --- Tin đăng ---
+  getPendingRooms: () => axiosClient.get('/admin/rooms/pending'),
+  approveRoom: (id, approved, reason) => axiosClient.put(`/admin/rooms/${id}/approve`, { approved, reason }),
 
-  // Duyệt hoặc Từ chối phòng [cite: 211]
-  approveRoom: (roomId, isApproved, reason = "") => {
-    return axiosClient.put(`/admin/rooms/${roomId}/approve`, {
-      approved: isApproved, // [cite: 315]
-      reason: reason
-    });
-  },
-  
-  // Lấy danh sách gói dịch vụ để chủ trọ chọn [cite: 219]
-  getAllPackages: () => axiosClient.get("/admin/packages"),
-  
-  // Lấy tiện ích [cite: 216]
+  // --- Master Data (Tiện ích & Gói cước) ---
   getAllAmenities: () => axiosClient.get("/admin/amenities"),
+  createAmenity: (data) => axiosClient.post("/admin/amenities", data),
+  deleteAmenity: (id) => axiosClient.delete(`/admin/amenities/${id}`),
+
+  getAllPackages: () => axiosClient.get("/admin/packages"),
+  createPackage: (data) => axiosClient.post("/admin/packages", data),
+  deletePackage: (id) => axiosClient.delete(`/admin/packages/${id}`),
+
+  // --- Quản lý User & KYC ---
+  getAllUsers: () => axiosClient.get("/admin/users"), 
+  approveKYC: (id, approved) => axiosClient.put(`/admin/users/${id}/kyc`, { approved }),
+  toggleUserStatus: (id) => axiosClient.put(`/admin/users/${id}/status`),
 };
 
 export default adminService;

@@ -12,16 +12,24 @@ const RoomApprove = () => {
   const fetchRooms = async () => {
     setLoading(true);
     try {
-      // Gọi API lấy phòng Pending. 
-      // Nếu API backend trả về List<Room> thì dùng res.data
-      const res = await adminService.getPendingRooms(); 
-      setRooms(res.data || []);
+      const res = await adminService.getPendingRooms();
+
+      // --- SỬA ĐOẠN NÀY: Kiểm tra kỹ xem có phải mảng không ---
+      if (Array.isArray(res.data)) {
+        setRooms(res.data);
+      } else {
+        console.error("API trả về dữ liệu lạ:", res.data);
+        setRooms([]); // Nếu lỗi thì set mảng rỗng để web KHÔNG BỊ TRẮNG
+      }
+      // --------------------------------------------------------
+
     } catch (error) {
       console.log("Lỗi tải dữ liệu", error);
+      setRooms([]);
     } finally {
       setLoading(false);
     }
-  };
+  };  
 
   useEffect(() => { fetchRooms(); }, []);
 
@@ -55,10 +63,10 @@ const RoomApprove = () => {
       render: (imgs) => <Image src={imgs?.[0]} width={80} height={60} className="object-cover rounded" />
     },
     { title: 'Tiêu đề', dataIndex: 'title', width: 250 },
-    { 
-      title: 'Giá', 
-      dataIndex: 'price', 
-      render: (val) => <span className="text-blue-600 font-bold">{val?.toLocaleString()} đ</span> 
+    {
+      title: 'Giá',
+      dataIndex: 'price',
+      render: (val) => <span className="text-blue-600 font-bold">{val?.toLocaleString()} đ</span>
     },
     { title: 'Chủ trọ', dataIndex: 'landlordName' }, // [cite: 389]
     {
@@ -85,11 +93,11 @@ const RoomApprove = () => {
     <div className="p-4 bg-white rounded shadow">
       <h2 className="text-xl font-bold mb-4">Danh Sách Chờ Duyệt</h2>
       <Table dataSource={rooms} columns={columns} rowKey="id" loading={loading} />
-      
-      <Modal 
-        title="Từ chối duyệt tin" 
-        open={rejectModal.open} 
-        onOk={handleReject} 
+
+      <Modal
+        title="Từ chối duyệt tin"
+        open={rejectModal.open}
+        onOk={handleReject}
         onCancel={() => setRejectModal({ open: false, roomId: null })}
         okButtonProps={{ danger: true }}
       >

@@ -14,6 +14,8 @@ import RegisterLandlord from './pages/auth/RegisterLandlord';
 import MasterData from './pages/admin/MasterData';
 import MyRooms from './pages/landlord/MyRooms';
 import UserManagement from './pages/admin/UserManagement';
+import AppointmentManagement from './pages/landlord/AppointmentManagement';
+import RoomDetail from './pages/landlord/RoomDetail';
 
 // --- COMPONENT BẢO VỆ ROUTE (Chỉ cho phép đúng quyền truy cập) ---
 const ProtectedRoute = ({ allowedRoles }) => {
@@ -41,7 +43,8 @@ function App() {
         {/* Route Công khai */}
         <Route path="/login" element={<Login />} />
         <Route path="/register-landlord" element={<RegisterLandlord />} />
-        
+        <Route path="/rooms/:id" element={<RoomDetail />} />
+
         {/* Mặc định vào trang chủ sẽ nhảy tới login */}
         <Route path="/" element={<Navigate to="/login" />} />
 
@@ -50,7 +53,7 @@ function App() {
           <Route path="/admin" element={<MainLayout />}>
             {/* Mặc định vào /admin sẽ nhảy tới trang duyệt tin */}
             <Route index element={<Navigate to="approve-rooms" />} />
-            
+
             <Route path="dashboard" element={<div>Trang Thống Kê (Đang phát triển)</div>} />
             <Route path="approve-rooms" element={<RoomApprove />} />
             <Route path="master-data" element={<MasterData />} />
@@ -61,12 +64,14 @@ function App() {
         {/* --- KHU VỰC CHỦ TRỌ (Bọc bởi MainLayout) --- */}
         <Route element={<ProtectedRoute allowedRoles={['LANDLORD']} />}>
           <Route path="/landlord" element={<MainLayout />}>
-             {/* Mặc định vào /landlord sẽ nhảy tới trang đăng phòng */}
+            {/* Mặc định vào /landlord sẽ nhảy tới trang đăng phòng */}
             <Route index element={<Navigate to="create-room" />} />
-
+            <Route path="appointments" element={<AppointmentManagement />} />
             <Route path="dashboard" element={<div>Thống kê chủ trọ (Đang phát triển)</div>} />
             <Route path="create-room" element={<CreateRoom />} />
-            <Route path="rooms" element={<MyRooms />}/>
+            <Route path="rooms" element={<MyRooms />} />
+          
+
           </Route>
         </Route>
 

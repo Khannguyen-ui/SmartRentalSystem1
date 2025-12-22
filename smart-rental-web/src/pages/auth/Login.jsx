@@ -3,8 +3,7 @@ import { Form, Input, Button, Card, Typography, message } from 'antd';
 import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
 // 1. Thêm import Link vào đây
 import { useNavigate, Link } from 'react-router-dom';
-import useAuth from '../../hooks/useAuth'; 
-
+import useAuth from '../../hooks/useAuth';
 const { Title, Text } = Typography;
 
 const Login = () => {

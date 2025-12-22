@@ -1,17 +1,29 @@
 import axiosClient from "../config/axiosClient";
 
 const userService = {
-  // Lấy danh sách toàn bộ user (Có thể phân trang nếu backend hỗ trợ)
+  // 1. Lấy danh sách (GET)
   getAllUsers: () => {
     return axiosClient.get('/admin/users');
   },
 
-  // Khóa hoặc Mở khóa tài khoản
-  // status: true (Active), false (Locked)
-  updateUserStatus: (userId, status) => {
-    return axiosClient.put(`/admin/users/${userId}/status`, null, {
-        params: { active: status }
-    });
+  // 2. Thêm mới (POST)
+  createUser: (data) => {
+    return axiosClient.post('/admin/users', data);
+  },
+
+  // 3. Cập nhật thông tin (PUT)
+  updateUser: (id, data) => {
+    return axiosClient.put(`/admin/users/${id}`, data);
+  },
+
+  // 4. Khóa/Mở khóa (PUT)
+  updateUserStatus: (userId) => {
+    return axiosClient.put(`/admin/users/${userId}/status`);
+  },
+
+  // 5. Xóa vĩnh viễn (DELETE)
+  deleteUser: (id) => {
+    return axiosClient.delete(`/admin/users/${id}`);
   }
 };
 
