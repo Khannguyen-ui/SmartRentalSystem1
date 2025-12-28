@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Form, Input, InputNumber, Select, Button, Upload, Card, Row, Col, message, Divider } from 'antd';
-import { UploadOutlined, EnvironmentOutlined } from '@ant-design/icons';
+import { UploadOutlined, EnvironmentOutlined, VideoCameraOutlined } from '@ant-design/icons';
 import roomService from '../../services/roomService';
 import { useNavigate } from 'react-router-dom';
 
@@ -11,13 +11,17 @@ const CreateRoom = () => {
   const [form] = Form.useForm();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  
+  // State quản lý upload ảnh
   const [fileList, setFileList] = useState([]);
+  
+  // State quản lý upload video
+  const [videoLoading, setVideoLoading] = useState(false);
 
   // --- STATE DỮ LIỆU THẬT ---
   const [amenitiesList, setAmenitiesList] = useState([]);
   const [packagesList, setPackagesList] = useState([]);
 
-  // 1. Gọi API lấy dữ liệu nền khi vào trang
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
@@ -34,14 +38,33 @@ const CreateRoom = () => {
     fetchMasterData();
   }, []);
 
-  // Xử lý Upload ảnh
-  const handleUpload = async ({ file, onSuccess, onError }) => {
+  // 1. Xử lý Upload ảnh (Giữ nguyên)
+  const handleUploadImages = async ({ file, onSuccess, onError }) => {
     try {
       const res = await roomService.uploadImage(file);
       onSuccess(res.data.url);
     } catch (err) {
       onError(err);
       message.error("Upload ảnh lỗi");
+    }
+  };
+
+  // 2. Xử lý Upload Video (MỚI THÊM)
+  const handleUploadVideo = async ({ file, onSuccess, onError }) => {
+    setVideoLoading(true);
+    try {
+      // API Backend CloudinaryConfig đã để resource_type: "auto" nên upload video vô tư
+      const res = await roomService.uploadImage(file); 
+      
+      // Sau khi upload xong, tự động điền URL vào ô input videoUrl
+      form.setFieldsValue({ videoUrl: res.data.url });
+      onSuccess("ok");
+      message.success("Upload video thành công!");
+    } catch (err) {
+      onError(err);
+      message.error("Upload video thất bại, vui lòng kiểm tra dung lượng (<50MB)");
+    } finally {
+      setVideoLoading(false);
     }
   };
 
@@ -72,7 +95,10 @@ const CreateRoom = () => {
           genderConstraint: values.genderConstraint,
           servicePackageId: values.servicePackageId,
           images: imageUrls,
-          amenities: values.amenities // Gửi lên mảng tên tiện ích
+          amenities: values.amenities,
+          
+          // --- THÊM TRƯỜNG VIDEO VÀO PAYLOAD ---
+          videoUrl: values.videoUrl 
       };
 
       await roomService.createRoom(payload);
@@ -144,12 +170,11 @@ const CreateRoom = () => {
                 <Input prefix={<EnvironmentOutlined />} placeholder="Số nhà, tên đường, phường, quận..." />
             </Form.Item>
 
-            {/* RENDER TIỆN ÍCH THẬT TỪ API */}
             <Form.Item name="amenities" label="Tiện ích có sẵn">
                 <Select mode="multiple" placeholder="Chọn tiện ích" loading={amenitiesList.length === 0}>
                     {amenitiesList.map(a => (
                         <Option key={a.id} value={a.name}>
-                            {a.name} {/* Có thể thêm icon: <img src={a.iconUrl} /> {a.name} */}
+                            {a.name}
                         </Option>
                     ))}
                 </Select>
@@ -159,11 +184,39 @@ const CreateRoom = () => {
                 <TextArea rows={4} />
             </Form.Item>
 
-            <Divider orientation="left">Hình ảnh & Gói tin</Divider>
+            {/* --- PHẦN VIDEO & HÌNH ẢNH (ĐÃ CẬP NHẬT) --- */}
+            <Divider orientation="left">Hình ảnh & Video</Divider>
+
+            <Form.Item 
+                name="videoUrl" 
+                label="Video giới thiệu phòng"
+                tooltip="Bạn có thể dán link Youtube hoặc bấm nút bên phải để upload video lên hệ thống"
+            >
+                <Input 
+                    prefix={<VideoCameraOutlined />} 
+                    placeholder="Dán link video (Youtube/Drive) hoặc Upload..." 
+                    addonAfter={
+                        <Upload 
+                            accept="video/*" 
+                            showUploadList={false} 
+                            customRequest={handleUploadVideo}
+                        >
+                            <Button 
+                                type="text" 
+                                icon={<UploadOutlined />} 
+                                loading={videoLoading}
+                            >
+                                {videoLoading ? "Đang lên..." : "Tải lên"}
+                            </Button>
+                        </Upload>
+                    }
+                />
+            </Form.Item>
+
             <Form.Item label="Hình ảnh phòng (Tối đa 5 ảnh)">
                 <Upload 
                     listType="picture-card"
-                    customRequest={handleUpload}
+                    customRequest={handleUploadImages}
                     fileList={fileList}
                     onChange={({ fileList }) => setFileList(fileList)}
                     maxCount={5}
@@ -172,12 +225,12 @@ const CreateRoom = () => {
                 </Upload>
             </Form.Item>
 
-            {/* RENDER GÓI CƯỚC THẬT TỪ API */}
+            <Divider orientation="left">Thanh toán phí đăng tin</Divider>
             <Form.Item 
                 name="servicePackageId" 
-                label="Chọn gói đăng tin (Trừ tiền trong ví)" 
+                label="Chọn gói dịch vụ" 
                 rules={[{ required: true }]}
-                help="Nếu ví không đủ tiền, vui lòng nạp thêm trước khi đăng."
+                help="Phí sẽ được trừ trực tiếp vào ví của bạn sau khi Admin duyệt tin."
             >
                 <Select placeholder="Chọn gói..." loading={packagesList.length === 0}>
                     {packagesList.map(p => (

@@ -1,8 +1,9 @@
 import axios from 'axios';
 
 const axiosClient = axios.create({
-  // Đường dẫn đến Backend Spring Boot (Port 8080)
-  baseURL: 'http://localhost:8080/api', 
+  // Đường dẫn đến Backend AWS EC2
+  baseURL: 'http://localhost:8080/api',      
+  // baseURL: 'http://18.142.105.8:8080/api', 
   headers: {
     'Content-Type': 'application/json',
   },

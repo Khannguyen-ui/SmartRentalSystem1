@@ -1,23 +1,70 @@
-import React from 'react';
-import { Layout, Button, Avatar, Dropdown, Space } from 'antd';
-import { UserOutlined, LogoutOutlined } from '@ant-design/icons';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Layout, Avatar, Dropdown, Space, Badge, Button } from 'antd';
+import { UserOutlined, LogoutOutlined, BellOutlined, ProfileOutlined } from '@ant-design/icons';
+import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import useAuth from '../../hooks/useAuth';
+import notificationService from '../../services/notificationService'; // Import service để lấy số lượng
 
 const { Header, Content } = Layout;
 
 const MainLayout = () => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // State đếm số thông báo chưa đọc
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const items = [
+  // Gọi API lấy số thông báo chưa đọc khi component load
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const res = await notificationService.getMyNotifications();
+        if (res.data) {
+          // Đếm số lượng item có isRead = false
+          const count = res.data.filter(n => !n.isRead).length;
+          setUnreadCount(count);
+        }
+      } catch (error) {
+        console.error("Lỗi tải thông báo", error);
+      }
+    };
+
+    // Chỉ gọi nếu đã đăng nhập
+    if (user) {
+      fetchUnreadCount();
+    }
+  }, [user]);
+
+  // Cấu hình menu khi bấm vào Avatar
+  const userMenuItems = [
     {
-      key: '1',
-      label: <span onClick={logout}>Đăng xuất</span>,
+      key: 'profile',
+      label: 'Thông tin cá nhân',
+      icon: <ProfileOutlined />,
+      onClick: () => navigate('/profile'), // Chuyển hướng đến trang Profile
+    },
+    {
+      type: 'divider', // Đường kẻ ngang phân cách
+    },
+    {
+      key: 'logout',
+      label: 'Đăng xuất',
       icon: <LogoutOutlined />,
       danger: true,
+      onClick: logout,
     },
   ];
+
+  // Xử lý khi bấm vào chuông thông báo
+  const handleNotificationClick = () => {
+    if (user?.role === 'LANDLORD') {
+      navigate('/landlord/finance'); // Chủ trọ thì qua trang Tài chính/Thông báo
+    } else {
+      // Nếu là Admin hoặc Tenant thì xử lý khác (hoặc tạo trang riêng)
+      navigate('/notifications'); 
+    }
+  };
 
   return (
     <Layout className="min-h-screen">
@@ -26,16 +73,37 @@ const MainLayout = () => {
       
       <Layout>
         {/* Header ở trên cùng */}
-        <Header className="bg-white flex justify-end items-center px-6 shadow-sm">
-          <Dropdown menu={{ items }} placement="bottomRight">
-            <Space className="cursor-pointer hover:bg-gray-50 p-2 rounded">
-              <Avatar icon={<UserOutlined />} src={user?.avatar} />
-              <span className="font-semibold">{user?.fullName || 'Người dùng'}</span>
-            </Space>
-          </Dropdown>
+        <Header className="bg-white flex justify-end items-center px-6 shadow-sm sticky top-0 z-10">
+          <Space size="large">
+            
+            {/* 1. Icon Thông báo */}
+            <div 
+              className="cursor-pointer flex items-center hover:bg-gray-100 p-2 rounded-full transition-colors"
+              onClick={handleNotificationClick}
+            >
+              <Badge count={unreadCount} size="small" offset={[0, 0]}>
+                <BellOutlined style={{ fontSize: '20px', color: '#555' }} />
+              </Badge>
+            </div>
+
+            {/* 2. Avatar & Dropdown Menu */}
+            <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
+              <Space className="cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
+                <Avatar 
+                  icon={<UserOutlined />} 
+                  src={user?.avatarUrl} // Sửa thành avatarUrl cho khớp với API UserEntity
+                  className="bg-blue-500"
+                />
+                <span className="font-medium text-gray-700 select-none">
+                  {user?.fullName || 'Người dùng'}
+                </span>
+              </Space>
+            </Dropdown>
+
+          </Space>
         </Header>
 
-        {/* Nội dung trang con sẽ hiển thị ở đây */}
+        {/* Nội dung trang con */}
         <Content className="m-4 p-6 bg-white rounded-lg shadow overflow-auto">
           <Outlet />
         </Content>
