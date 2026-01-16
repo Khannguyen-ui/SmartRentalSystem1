@@ -1,12 +1,12 @@
 import axiosClient from "../config/axiosClient";
 
 const roomService = {
-  // 1. Lấy danh sách phòng của chủ trọ đang đăng nhập
+  // 1. Lấy danh sách phòng của chủ trọ
   getMyRooms: () => {
     return axiosClient.get('/rooms/my-rooms');
   },
 
-  // 2. Tạo phòng mới (Form có upload ảnh)
+  // 2. Tạo phòng mới
   createRoom: (data) => {
     return axiosClient.post('/rooms', data);
   },
@@ -15,32 +15,51 @@ const roomService = {
   deleteRoom: (id) => {
     return axiosClient.delete(`/rooms/${id}`);
   },
-  // 4. Cập nhật thông tin phòng (MỚI THÊM)
+
+  // 4. Cập nhật thông tin phòng
   updateRoom: (id, data) => {
-    // Method PUT thường dùng để update
     return axiosClient.put(`/rooms/${id}`, data);
   },
 
-  // 4. Upload ảnh (Gọi API FileUploadController)
+  // 5. Upload ảnh/video
   uploadImage: (file) => {
     const formData = new FormData();
     formData.append("file", file);
     return axiosClient.post('/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' }
+      headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-    getAllAmenities: () => {
+
+  // 6. Master Data (Tiện ích, Gói cước)
+  getAllAmenities: () => {
     return axiosClient.get('/admin/amenities');
   },
-
-  // Lấy danh sách gói cước từ Backend
   getAllPackages: () => {
     return axiosClient.get('/admin/packages');
   },
+
+  // 7. Lấy chi tiết phòng (Public)
   getRoomById: (id) => {
     return axiosClient.get(`/rooms/${id}`);
   },
-  
+
+  // 8. Tìm kiếm (Dùng cho HomePage - nhận vào object filter)
+  searchRooms: (filter) => {
+    return axiosClient.get('/rooms/search', {
+      params: {
+        lat: filter.lat,
+        lng: filter.lng,
+        radius: filter.radius || 50000
+      }
+    });
+  },
+
+  // 9. Tìm kiếm gần đây (FIX LỖI: Dùng cho SearchMap - nhận vào tham số rời)
+  searchNearby: (lat, lng, radius = 10000) => {
+    return axiosClient.get("/rooms/search", {
+      params: { lat, lng, radius }
+    });
+  }
 };
 
 export default roomService;

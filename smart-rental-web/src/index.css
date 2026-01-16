@@ -1,3 +1,37 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* --- LEAFLET CLUSTER CUSTOM STYLES --- */
+
+/* Hình tròn bao quanh số lượng */
+.custom-marker-cluster {
+  background-color: rgba(24, 144, 255, 0.6); /* Màu xanh Antd mờ */
+  border-radius: 50%;
+  display: flex !important; /* Đè lên display mặc định của leaflet */
+  align-items: center;
+  justify-content: center;
+  border: 2px solid #fff;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+}
+
+/* Số lượng bên trong */
+.cluster-icon {
+  width: 24px;
+  height: 24px;
+  background-color: #1677ff; /* Màu xanh đậm Antd */
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 12px;
+}
+
+/* Hiệu ứng khi rê chuột vào cluster */
+.custom-marker-cluster:hover {
+  background-color: rgba(24, 144, 255, 0.8);
+  transform: scale(1.1);
+  z-index: 1000 !important;
+}

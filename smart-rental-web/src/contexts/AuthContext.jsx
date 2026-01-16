@@ -1,26 +1,37 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { message } from 'antd';
 import axiosClient from '../config/axiosClient';
+// 1. IMPORT SERVICE ĐỂ GỌI API PROFILE
+import userService from '../services/userService';
 
-// --- THAY ĐỔI: Thêm chữ 'export' vào đây để file hook bên ngoài dùng được ---
 export const AuthContext = createContext(null);
-// --------------------------------------------------------------------------
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  // 2. THÊM HÀM LẤY LẠI THÔNG TIN USER TỪ SERVER
+  const refreshProfile = async () => {
+    try {
+      const token = localStorage.getItem('accessToken');
+      if (token) {
+        // Gọi API /users/profile để lấy dữ liệu mới nhất (KYC, Ví, ...)
+        const res = await userService.getProfile();
+        setUser(res.data); 
+      }
+    } catch (error) {
+      console.error("Không thể tải thông tin user mới nhất:", error);
+    }
+  };
+
   // Check login F5
   useEffect(() => {
-    const checkLogin = () => {
+    const checkLogin = async () => {
       const token = localStorage.getItem('accessToken');
-      const role = localStorage.getItem('role');
-      const fullName = localStorage.getItem('fullName');
-      const id = localStorage.getItem('userId');
-      const email = localStorage.getItem('email');
-
-      if (token && role) {
-        setUser({ id, role, fullName, email });
+      
+      if (token) {
+        // Thay vì chỉ lấy từ localStorage (dữ liệu cũ), ta gọi API lấy dữ liệu mới luôn
+        await refreshProfile();
       }
       setLoading(false);
     };
@@ -42,12 +53,10 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('userId', data.id);
       localStorage.setItem('email', data.email);
       
-      setUser({ 
-        id: data.id,
-        role: data.role, 
-        fullName: data.fullName,
-        email: data.email
-      });
+      // Gọi refreshProfile để đảm bảo state user có đủ mọi trường (kycStatus, walletBalance...)
+      // thay vì chỉ vài trường cơ bản trả về lúc login
+      await refreshProfile();
+      
       return true;
     } catch (error) {
       console.error("Login failed:", error);
@@ -64,7 +73,8 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, loading }}>
+    // 3. ĐƯA refreshProfile VÀO ĐÂY ĐỂ BÊN NGOÀI DÙNG ĐƯỢC
+    <AuthContext.Provider value={{ user, login, logout, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>
   );

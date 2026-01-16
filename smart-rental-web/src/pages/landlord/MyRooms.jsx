@@ -65,7 +65,6 @@ const MyRooms = () => {
   const handleUploadImage = async ({ file, onSuccess, onError }) => {
     try {
       const res = await roomService.uploadImage(file);
-      // Trả về object chứa url để component Upload nhận diện
       onSuccess({ url: res.data.url }); 
     } catch (err) {
       onError(err);
@@ -101,25 +100,26 @@ const MyRooms = () => {
         const rawIds = editingRoom.amenities?.map(item => item.id) || [];
         const uniqueIds = [...new Set(rawIds)];
 
-        // b. Map hình ảnh cũ vào fileList để hiển thị
-        // Antd Upload cần định dạng: { uid, name, status, url }
+        // b. Map hình ảnh cũ vào fileList
         const initialImages = (editingRoom.images || []).map((url, index) => ({
-            uid: `-${index}`, // uid âm để tránh trùng
+            uid: `-${index}`, 
             name: `Ảnh ${index + 1}`,
             status: 'done',
             url: url
         }));
         setFileList(initialImages);
 
-        // c. Fill dữ liệu vào Form
+        // c. Fill dữ liệu vào Form (Bao gồm các trường mới)
         form.setFieldsValue({
             ...editingRoom,
             amenities: uniqueIds,
-            // Nếu API trả về amenities là array object, ta chỉ lấy ID. 
-            // Nếu API Create/Update cần array String tên, bạn cần map theo name.
-            // Ở CreateRoom bạn map theo Name, nên ở đây tôi giả sử amenities input là ID, 
-            // nhưng nếu backend cần Name thì sửa lại map(item => item.name).
-            // Dựa trên code cũ của bạn, amenities đang nhận ID.
+            // Các trường mới sẽ tự động fill nếu tên trùng với key trong editingRoom
+            furnitureStatus: editingRoom.furnitureStatus,
+            legalStatus: editingRoom.legalStatus,
+            direction: editingRoom.direction,
+            floorNumber: editingRoom.floorNumber,
+            numBedrooms: editingRoom.numBedrooms,
+            numBathrooms: editingRoom.numBathrooms
         });
     } else {
         form.resetFields();
@@ -133,12 +133,10 @@ const MyRooms = () => {
         const values = await form.validateFields();
         setUpdateLoading(true);
 
-        // Lấy danh sách link ảnh cuối cùng
-        // file.response.url (ảnh mới up) hoặc file.url (ảnh cũ)
         const finalImages = fileList.map(f => {
             if (f.response && f.response.url) return f.response.url;
             return f.url;
-        }).filter(url => url); // Lọc bỏ null/undefined
+        }).filter(url => url); 
 
         if (finalImages.length === 0) {
             message.error("Phòng cần ít nhất 1 hình ảnh!");
@@ -153,7 +151,7 @@ const MyRooms = () => {
         
         await roomService.updateRoom(editingRoom.id, payload);
         
-        message.success("Cập nhật thành công! Tin sẽ chuyển sang trạng thái chờ duyệt.");
+        message.success("Cập nhật thành công!");
         setIsModalOpen(false);
         setEditingRoom(null);
         fetchMyRooms(); 
@@ -284,7 +282,7 @@ const MyRooms = () => {
 
       <Table columns={columns} dataSource={filteredData} rowKey="id" loading={loading} pagination={{ pageSize: 5 }} />
 
-      {/* --- MODAL CẬP NHẬT ĐẦY ĐỦ --- */}
+      {/* --- MODAL CẬP NHẬT ĐẦY ĐỦ (ĐÃ NÂNG CẤP) --- */}
       <Modal
         title="Cập nhật thông tin phòng"
         open={isModalOpen}
@@ -304,6 +302,8 @@ const MyRooms = () => {
                 </div>
             )}
 
+            {/* === 1. THÔNG TIN CƠ BẢN === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Thông tin cơ bản</Divider>
             <Row gutter={16}>
                 <Col span={16}>
                     <Form.Item label="Tên phòng trọ" name="title" rules={[{ required: true }]}>
@@ -320,6 +320,65 @@ const MyRooms = () => {
                 </Col>
             </Row>
 
+            {/* === 2. ĐẶC ĐIỂM CHI TIẾT (MỚI THÊM) === */}
+            <div className="bg-gray-50 p-3 rounded mb-4 border border-gray-200">
+                <Row gutter={16}>
+                    <Col span={8}>
+                        <Form.Item name="furnitureStatus" label="Tình trạng nội thất">
+                            <Select placeholder="Chọn tình trạng">
+                                <Option value="Nội thất đầy đủ">Nội thất đầy đủ</Option>
+                                <Option value="Nội thất cơ bản">Nội thất cơ bản</Option>
+                                <Option value="Nhà trống">Nhà trống</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                        <Form.Item name="legalStatus" label="Giấy tờ pháp lý">
+                            <Select placeholder="Chọn loại giấy tờ">
+                                <Option value="Đã có sổ">Đã có sổ</Option>
+                                <Option value="Đang chờ sổ">Đang chờ sổ</Option>
+                                <Option value="Giấy tờ khác">Giấy tờ khác</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                    <Col span={8}>
+                        <Form.Item name="direction" label="Hướng cửa chính">
+                            <Select placeholder="Chọn hướng">
+                                <Option value="Đông">Đông</Option>
+                                <Option value="Tây">Tây</Option>
+                                <Option value="Nam">Nam</Option>
+                                <Option value="Bắc">Bắc</Option>
+                                <Option value="Đông Nam">Đông Nam</Option>
+                                <Option value="Tây Nam">Tây Nam</Option>
+                            </Select>
+                        </Form.Item>
+                    </Col>
+                </Row>
+                <Row gutter={16}>
+                    <Col span={6}>
+                        <Form.Item name="numBedrooms" label="Phòng ngủ">
+                            <InputNumber min={0} className="w-full" />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                        <Form.Item name="numBathrooms" label="Vệ sinh">
+                            <InputNumber min={0} className="w-full" />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                        <Form.Item name="floorNumber" label="Số tầng">
+                            <InputNumber min={1} className="w-full" />
+                        </Form.Item>
+                    </Col>
+                    <Col span={6}>
+                        <Form.Item label="Sức chứa" name="capacity" rules={[{ required: true }]}>
+                            <InputNumber style={{ width: '100%' }} min={1} />
+                        </Form.Item>
+                    </Col>
+                </Row>
+            </div>
+
+            {/* === 3. GIÁ & DIỆN TÍCH === */}
             <Row gutter={16}>
                 <Col span={8}>
                     <Form.Item label="Giá thuê" name="price" rules={[{ required: true }]}>
@@ -338,24 +397,6 @@ const MyRooms = () => {
                 </Col>
             </Row>
             
-            <Row gutter={16}>
-                 <Col span={12}>
-                    <Form.Item label="Sức chứa (Người)" name="capacity" rules={[{ required: true }]}>
-                        <InputNumber style={{ width: '100%' }} min={1} />
-                    </Form.Item>
-                 </Col>
-                 <Col span={12}>
-                    <Form.Item label="Giới tính cho phép" name="genderConstraint">
-                        <Select>
-                            <Option value="MALE_ONLY">Chỉ nam</Option>
-                            <Option value="FEMALE_ONLY">Chỉ nữ</Option>
-                            <Option value="ANY">Nam/Nữ đều được</Option>
-                            <Option value="MIXED">Nam nữ tự do</Option>
-                        </Select>
-                    </Form.Item>
-                 </Col>
-            </Row>
-
             <Form.Item label="Địa chỉ" name="address" rules={[{ required: true }]}>
                 <Input />
             </Form.Item>
@@ -376,7 +417,6 @@ const MyRooms = () => {
 
             <Divider orientation="left">Media (Ảnh & Video)</Divider>
 
-            {/* --- CẬP NHẬT: Upload Video trong Modal --- */}
             <Form.Item 
                 label="Video URL" 
                 name="videoUrl"
@@ -395,7 +435,6 @@ const MyRooms = () => {
                 />
             </Form.Item>
 
-            {/* --- CẬP NHẬT: Quản lý Hình ảnh (Thêm/Xóa) --- */}
             <Form.Item label="Hình ảnh phòng">
                 <Upload 
                     listType="picture-card"

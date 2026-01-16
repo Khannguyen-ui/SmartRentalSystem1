@@ -24,22 +24,26 @@ const Sidebar = () => {
     { key: '/admin/approve-rooms', icon: <CheckCircleOutlined />, label: 'Duyệt tin đăng' },
     { key: '/admin/users', icon: <UserOutlined />, label: 'Quản lý người dùng' },
     { key: '/admin/master-data', icon: <DatabaseOutlined />, label: 'Quản lý Dữ liệu' },
-    
-  
   ];
 
   // Menu dành cho Chủ trọ
   const landlordItems = [
-    { key: '/landlord/create-room', icon: <HomeOutlined />, label: 'Đăng phòng mới' },
-    { key: '/landlord/rooms', icon: <DashboardOutlined />, label: 'Phòng của tôi' },
+    { key: '/landlord/create-room', icon: <HomeOutlined />, label: 'Đăng tin' },
+    { key: '/landlord/room-list', icon: <DashboardOutlined />, label: 'Tin đăng' },
     { key: '/landlord/appointments', icon: <ClockCircleOutlined />, label: 'Quản lý Lịch hẹn' },
   ];
 
   return (
     <Sider width={240} theme="dark" collapsible breakpoint="lg">
-      <div className="h-16 flex items-center justify-center text-white font-bold text-xl bg-blue-600">
+      {/* --- PHẦN ĐÃ CHỈNH SỬA --- */}
+      <div 
+        className="h-16 flex items-center justify-center text-white font-bold text-xl bg-blue-600 cursor-pointer hover:bg-blue-500 transition-colors"
+        onClick={() => navigate('/')} // Điều hướng về trang chủ
+      >
         SMART RENTAL
       </div>
+      {/* ------------------------- */}
+      
       <Menu
         theme="dark"
         mode="inline"

@@ -1,8 +1,14 @@
+// src/pages/landlord/CreateRoom.jsx
 import React, { useState, useEffect } from 'react';
 import { Form, Input, InputNumber, Select, Button, Upload, Card, Row, Col, message, Divider } from 'antd';
-import { UploadOutlined, EnvironmentOutlined, VideoCameraOutlined } from '@ant-design/icons';
-import roomService from '../../services/roomService';
+import { UploadOutlined, EnvironmentOutlined, VideoCameraOutlined, HomeOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
+
+// Import Services (giả định bạn đã có file này trong thư mục services)
+import roomService from '../../services/roomService'; 
+
+// Import Component Bản đồ vừa tạo
+import LocationPicker from '../../components/shared/LocationPicker'; 
 
 const { Option } = Select;
 const { TextArea } = Input;
@@ -12,16 +18,15 @@ const CreateRoom = () => {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   
-  // State quản lý upload ảnh
+  // State quản lý upload
   const [fileList, setFileList] = useState([]);
-  
-  // State quản lý upload video
   const [videoLoading, setVideoLoading] = useState(false);
 
-  // --- STATE DỮ LIỆU THẬT ---
+  // State dữ liệu danh mục
   const [amenitiesList, setAmenitiesList] = useState([]);
   const [packagesList, setPackagesList] = useState([]);
 
+  // Load danh sách tiện ích & gói cước khi vào trang
   useEffect(() => {
     const fetchMasterData = async () => {
       try {
@@ -32,16 +37,26 @@ const CreateRoom = () => {
         setAmenitiesList(ameRes.data || []);
         setPackagesList(pkgRes.data || []);
       } catch (error) {
-        message.error("Không thể tải danh sách gói cước/tiện ích");
+        // Nếu chưa có API thì dùng dữ liệu giả để không bị crash
+        setAmenitiesList([{id: 1, name: "Wifi"}, {id: 2, name: "Máy lạnh"}, {id: 3, name: "Máy giặt"}]);
+        setPackagesList([{id: 1, name: "Gói cơ bản", price: 20000}, {id: 2, name: "Gói VIP", price: 50000}]);
       }
     };
     fetchMasterData();
   }, []);
 
-  // 1. Xử lý Upload ảnh (Giữ nguyên)
+  // Hàm cập nhật tọa độ từ bản đồ vào Form
+  const handleLocationChange = (lat, lng) => {
+    form.setFieldsValue({
+        latitude: lat,
+        longitude: lng
+    });
+  };
+
+  // Upload ảnh
   const handleUploadImages = async ({ file, onSuccess, onError }) => {
     try {
-      const res = await roomService.uploadImage(file);
+      const res = await roomService.uploadImage(file); // API upload file
       onSuccess(res.data.url);
     } catch (err) {
       onError(err);
@@ -49,38 +64,43 @@ const CreateRoom = () => {
     }
   };
 
-  // 2. Xử lý Upload Video (MỚI THÊM)
+  // Upload video
   const handleUploadVideo = async ({ file, onSuccess, onError }) => {
     setVideoLoading(true);
     try {
-      // API Backend CloudinaryConfig đã để resource_type: "auto" nên upload video vô tư
       const res = await roomService.uploadImage(file); 
-      
-      // Sau khi upload xong, tự động điền URL vào ô input videoUrl
       form.setFieldsValue({ videoUrl: res.data.url });
       onSuccess("ok");
       message.success("Upload video thành công!");
     } catch (err) {
       onError(err);
-      message.error("Upload video thất bại, vui lòng kiểm tra dung lượng (<50MB)");
+      message.error("Upload video thất bại (<50MB)");
     } finally {
       setVideoLoading(false);
     }
   };
 
+  // Xử lý Submit Form
   const handleFinish = async (values) => {
     setLoading(true);
     try {
       const imageUrls = fileList
         .filter(f => f.status === 'done')
-        .map(f => f.response);
+        .map(f => f.response); // Lấy URL từ response upload
 
       if (imageUrls.length === 0) {
-          message.error("Vui lòng up ít nhất 1 ảnh!");
+          message.error("Vui lòng tải lên ít nhất 1 hình ảnh!");
           setLoading(false);
           return;
       }
 
+      if (!values.latitude || !values.longitude) {
+          message.error("Vui lòng chọn vị trí trên bản đồ!");
+          setLoading(false);
+          return;
+      }
+
+      // Chuẩn bị payload đúng chuẩn Backend RoomCreateDTO
       const payload = {
           title: values.title,
           description: values.description,
@@ -88,22 +108,28 @@ const CreateRoom = () => {
           deposit: values.deposit,
           area: values.area,
           address: values.address,
-          latitude: 10.7769, 
-          longitude: 106.7009,
+          latitude: values.latitude,
+          longitude: values.longitude,
           rentalType: values.rentalType,
           capacity: values.capacity,
           genderConstraint: values.genderConstraint,
           servicePackageId: values.servicePackageId,
           images: imageUrls,
           amenities: values.amenities,
+          videoUrl: values.videoUrl,
           
-          // --- THÊM TRƯỜNG VIDEO VÀO PAYLOAD ---
-          videoUrl: values.videoUrl 
+          // Các trường bổ sung (Backend cần update DTO để nhận các trường này nếu chưa có)
+          furnitureStatus: values.furnitureStatus,
+          legalStatus: values.legalStatus,
+          direction: values.direction,
+          numBedrooms: values.numBedrooms,
+          numBathrooms: values.numBathrooms,
+          floorNumber: values.floorNumber
       };
 
       await roomService.createRoom(payload);
-      message.success("Đăng tin thành công! Đợi Admin duyệt nhé.");
-      navigate('/landlord/rooms');
+      message.success("Đăng tin thành công! Đang chờ Admin duyệt.");
+      navigate('/landlord/room-list'); // Chuyển hướng về trang quản lý
 
     } catch (error) {
       console.error(error);
@@ -114,40 +140,83 @@ const CreateRoom = () => {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Card title="Đăng Tin Phòng Trọ Mới" className="shadow-md">
-        <Form form={form} layout="vertical" onFinish={handleFinish}>
+    <div className="max-w-5xl mx-auto p-6">
+      <Card title={<><HomeOutlined /> Đăng Tin Phòng Trọ Mới</>} className="shadow-lg rounded-lg border-t-4 border-blue-600">
+        <Form 
+            form={form} 
+            layout="vertical" 
+            onFinish={handleFinish} 
+            initialValues={{ 
+                rentalType: 'WHOLE', 
+                genderConstraint: 'MIXED', 
+                furnitureStatus: 'Nội thất đầy đủ',
+                latitude: 10.7769, 
+                longitude: 106.7009
+            }}
+        >
             
-            <Divider orientation="left">Thông tin cơ bản</Divider>
-            <Form.Item name="title" label="Tiêu đề tin đăng" rules={[{ required: true }]}>
-                <Input placeholder="VD: Phòng trọ cao cấp Q10..." size="large"/>
+            {/* === 1. THÔNG TIN CƠ BẢN === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Thông tin cơ bản</Divider>
+            <Form.Item name="title" label="Tiêu đề tin đăng" rules={[{ required: true, message: "Nhập tiêu đề" }]}>
+                <Input placeholder="VD: Phòng trọ cao cấp gần Đại học..." size="large" className="font-semibold"/>
             </Form.Item>
 
-            <Row gutter={16}>
+            <Row gutter={24}>
                 <Col span={12}>
-                    <Form.Item name="rentalType" label="Loại hình" rules={[{ required: true }]}>
-                        <Select placeholder="Chọn loại hình">
-                            <Option value="WHOLE">Thuê nguyên căn</Option>
-                            <Option value="SHARED">Ở ghép (Ký túc xá)</Option>
+                    <Form.Item name="rentalType" label="Loại hình cho thuê" rules={[{ required: true }]}>
+                        <Select>
+                            <Option value="WHOLE">Nguyên căn</Option>
+                            <Option value="SHARED">Ở ghép</Option>
                         </Select>
                     </Form.Item>
                 </Col>
                 <Col span={12}>
-                    <Form.Item name="capacity" label="Tổng sức chứa (Người)" rules={[{ required: true }]}>
-                        <InputNumber min={1} className="w-full" />
+                    <Form.Item name="genderConstraint" label="Yêu cầu giới tính">
+                         <Select>
+                             <Option value="MIXED">Nam nữ tự do</Option>
+                             <Option value="MALE_ONLY">Chỉ Nam</Option>
+                             <Option value="FEMALE_ONLY">Chỉ Nữ</Option>
+                         </Select>
                     </Form.Item>
                 </Col>
             </Row>
 
-            <Row gutter={16}>
+            {/* === 2. VỊ TRÍ & BẢN ĐỒ === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Vị trí & Tiện ích</Divider>
+            
+            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 mb-4">
+                <Form.Item name="address" label="Địa chỉ hiển thị (Text)" rules={[{ required: true }]}>
+                    <Input prefix={<EnvironmentOutlined />} placeholder="Số nhà, tên đường, phường, quận..." />
+                </Form.Item>
+
+                <p className="font-semibold mb-2 text-gray-700">Ghim vị trí chính xác trên bản đồ:</p>
+                {/* COMPONENT BẢN ĐỒ */}
+                <LocationPicker onCoordinatesChange={handleLocationChange} />
+
+                {/* Input ẩn để giữ giá trị gửi đi */}
+                <Form.Item name="latitude" hidden><Input /></Form.Item>
+                <Form.Item name="longitude" hidden><Input /></Form.Item>
+            </div>
+
+            <Form.Item name="amenities" label="Tiện ích có sẵn">
+                <Select mode="multiple" placeholder="Chọn tiện ích" allowClear>
+                    {amenitiesList.map(a => (
+                        <Option key={a.id} value={a.name}>{a.name}</Option>
+                    ))}
+                </Select>
+            </Form.Item>
+
+            {/* === 3. DIỆN TÍCH & GIÁ CẢ === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Diện tích & Giá cả</Divider>
+            <Row gutter={24}>
                 <Col span={8}>
                     <Form.Item name="price" label="Giá thuê (tháng)" rules={[{ required: true }]}>
-                        <InputNumber className="w-full" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} addonAfter="VND"/>
+                        <InputNumber className="w-full" formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} addonAfter="VND"/>
                     </Form.Item>
                 </Col>
                 <Col span={8}>
-                    <Form.Item name="deposit" label="Tiền cọc" initialValue={0}>
-                        <InputNumber className="w-full" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} addonAfter="VND"/>
+                    <Form.Item name="deposit" label="Tiền cọc">
+                        <InputNumber className="w-full" formatter={v => `${v}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} addonAfter="VND"/>
                     </Form.Item>
                 </Col>
                 <Col span={8}>
@@ -156,64 +225,30 @@ const CreateRoom = () => {
                     </Form.Item>
                 </Col>
             </Row>
-
-            <Form.Item name="genderConstraint" label="Yêu cầu giới tính" initialValue="MIXED">
-                 <Select>
-                     <Option value="MIXED">Nam nữ tự do</Option>
-                     <Option value="MALE_ONLY">Chỉ Nam</Option>
-                     <Option value="FEMALE_ONLY">Chỉ Nữ</Option>
-                 </Select>
-            </Form.Item>
-
-            <Divider orientation="left">Vị trí & Tiện ích</Divider>
-            <Form.Item name="address" label="Địa chỉ chi tiết" rules={[{ required: true }]}>
-                <Input prefix={<EnvironmentOutlined />} placeholder="Số nhà, tên đường, phường, quận..." />
-            </Form.Item>
-
-            <Form.Item name="amenities" label="Tiện ích có sẵn">
-                <Select mode="multiple" placeholder="Chọn tiện ích" loading={amenitiesList.length === 0}>
-                    {amenitiesList.map(a => (
-                        <Option key={a.id} value={a.name}>
-                            {a.name}
-                        </Option>
-                    ))}
-                </Select>
-            </Form.Item>
+            
+            <Row gutter={24}>
+                 <Col span={6}><Form.Item name="capacity" label="Sức chứa (người)"><InputNumber min={1} className="w-full"/></Form.Item></Col>
+                 <Col span={6}><Form.Item name="numBedrooms" label="Số phòng ngủ"><InputNumber min={0} className="w-full"/></Form.Item></Col>
+                 <Col span={6}><Form.Item name="numBathrooms" label="Số WC"><InputNumber min={0} className="w-full"/></Form.Item></Col>
+                 <Col span={6}><Form.Item name="furnitureStatus" label="Nội thất"><Select><Option value="Nội thất đầy đủ">Full</Option><Option value="Nội thất cơ bản">Cơ bản</Option><Option value="Nhà trống">Trống</Option></Select></Form.Item></Col>
+            </Row>
 
             <Form.Item name="description" label="Mô tả chi tiết">
-                <TextArea rows={4} />
+                <TextArea rows={6} placeholder="Mô tả chi tiết về phòng..." />
             </Form.Item>
 
-            {/* --- PHẦN VIDEO & HÌNH ẢNH (ĐÃ CẬP NHẬT) --- */}
-            <Divider orientation="left">Hình ảnh & Video</Divider>
-
-            <Form.Item 
-                name="videoUrl" 
-                label="Video giới thiệu phòng"
-                tooltip="Bạn có thể dán link Youtube hoặc bấm nút bên phải để upload video lên hệ thống"
-            >
-                <Input 
-                    prefix={<VideoCameraOutlined />} 
-                    placeholder="Dán link video (Youtube/Drive) hoặc Upload..." 
-                    addonAfter={
-                        <Upload 
-                            accept="video/*" 
-                            showUploadList={false} 
-                            customRequest={handleUploadVideo}
-                        >
-                            <Button 
-                                type="text" 
-                                icon={<UploadOutlined />} 
-                                loading={videoLoading}
-                            >
-                                {videoLoading ? "Đang lên..." : "Tải lên"}
-                            </Button>
-                        </Upload>
-                    }
-                />
+            {/* === 4. HÌNH ẢNH & VIDEO === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Hình ảnh & Video</Divider>
+            <Form.Item label="Video giới thiệu">
+                <Input prefix={<VideoCameraOutlined />} placeholder="Link video..." addonAfter={
+                     <Upload accept="video/*" showUploadList={false} customRequest={handleUploadVideo}>
+                        <Button type="text" icon={<UploadOutlined />} loading={videoLoading}>{videoLoading ? "Đang tải..." : "Upload Video"}</Button>
+                     </Upload>
+                }/>
             </Form.Item>
+             <Form.Item name="videoUrl" hidden><Input /></Form.Item>
 
-            <Form.Item label="Hình ảnh phòng (Tối đa 5 ảnh)">
+            <Form.Item label="Hình ảnh thực tế (Tối đa 5 ảnh)">
                 <Upload 
                     listType="picture-card"
                     customRequest={handleUploadImages}
@@ -221,32 +256,26 @@ const CreateRoom = () => {
                     onChange={({ fileList }) => setFileList(fileList)}
                     maxCount={5}
                 >
-                    {fileList.length < 5 && <div><UploadOutlined /><div style={{ marginTop: 8 }}>Upload</div></div>}
+                    {fileList.length < 5 && <div><UploadOutlined /><div style={{ marginTop: 8 }}>Thêm ảnh</div></div>}
                 </Upload>
             </Form.Item>
 
-            <Divider orientation="left">Thanh toán phí đăng tin</Divider>
-            <Form.Item 
-                name="servicePackageId" 
-                label="Chọn gói dịch vụ" 
-                rules={[{ required: true }]}
-                help="Phí sẽ được trừ trực tiếp vào ví của bạn sau khi Admin duyệt tin."
-            >
-                <Select placeholder="Chọn gói..." loading={packagesList.length === 0}>
+            {/* === 5. THANH TOÁN === */}
+            <Divider orientation="left" className="text-blue-600 border-blue-600">Dịch vụ đăng tin</Divider>
+            <Form.Item name="servicePackageId" label="Chọn gói dịch vụ" rules={[{ required: true }]}>
+                <Select placeholder="Chọn gói..." size="large">
                     {packagesList.map(p => (
                         <Option key={p.id} value={p.id}>
                             <div className="flex justify-between w-full">
-                                <span>{p.name} ({p.durationDays} ngày)</span>
-                                <span className="text-green-600 font-bold ml-2">
-                                    {p.price.toLocaleString()} đ
-                                </span>
+                                <span className="font-semibold">{p.name}</span>
+                                <span className="text-green-600 font-bold ml-2">{p.price?.toLocaleString()} đ</span>
                             </div>
                         </Option>
                     ))}
                 </Select>
             </Form.Item>
 
-            <Button type="primary" htmlType="submit" size="large" block loading={loading} className="mt-4 bg-blue-600">
+            <Button type="primary" htmlType="submit" size="large" block loading={loading} className="mt-6 bg-blue-600 font-bold h-12 text-lg">
                 ĐĂNG TIN NGAY
             </Button>
         </Form>

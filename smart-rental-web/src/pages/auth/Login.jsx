@@ -1,53 +1,84 @@
 import React, { useState } from 'react';
-import { Form, Input, Button, Card, Typography, message } from 'antd';
-import { UserOutlined, LockOutlined, LoginOutlined } from '@ant-design/icons';
-// 1. Thêm import Link vào đây
+import { Form, Input, Button, Card, Typography, message, Divider } from 'antd';
+import { UserOutlined, LockOutlined, HomeFilled } from '@ant-design/icons';
 import { useNavigate, Link } from 'react-router-dom';
 import useAuth from '../../hooks/useAuth';
+
 const { Title, Text } = Typography;
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const { login, logout } = useAuth(); 
   const navigate = useNavigate();
 
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const success = await login(values.email, values.password);
+      // Trim khoảng trắng thừa ở email để tránh lỗi nhập liệu
+      const email = values.email.trim();
+      const success = await login(email, values.password);
 
       if (success) {
-        message.success("Đăng nhập thành công!");
-        const role = localStorage.getItem('role');
+        // Lấy role được lưu trong localStorage sau khi login thành công
+        const role = localStorage.getItem('role'); 
 
+        // --- 1. LOGIC CHẶN ADMIN ---
         if (role === 'ADMIN') {
-          navigate('/admin/approve-rooms');
-        } else if (role === 'LANDLORD') {
-          navigate('/landlord/create-room');
-        } else {
-          message.warning("Trang web này chỉ dành cho Admin và Chủ trọ.");
-          // navigate('/'); 
+          await logout(); // Đăng xuất ngay lập tức
+          message.warning("Cổng này dành cho Người dùng. Đang chuyển sang cổng Admin...");
+          
+          // Chuyển hướng sang trang đăng nhập Admin sau 1.5s
+          setTimeout(() => {
+             navigate('/admin/login');
+          }, 1500);
+          return;
+        } 
+        
+        // --- LOGIC ĐIỀU HƯỚNG THEO QUYỀN (ROLE) ---
+        
+        // --- 2. LOGIC CHO CHỦ TRỌ (LANDLORD) ---
+        if (role === 'LANDLORD') {
+          message.success("Chào mừng Chủ trọ quay trở lại!");
+          navigate('/landlord/room-list'); // Chuyển về trang quản lý tin đăng
+        } 
+        
+        // --- 3. LOGIC CHO NGƯỜI THUÊ (TENANT) - PHẦN BẠN YÊU CẦU ---
+        else if (role === 'TENANT') {
+          message.success("Đăng nhập thành công! Bắt đầu tìm phòng nào.");
+          // Bạn có thể đổi đường dẫn này thành bất kỳ đâu, ví dụ: '/search', '/profile'
+          navigate('/'); // Chuyển về trang chủ
         }
+
+        // --- 4. TRƯỜNG HỢP KHÁC (Fallback) ---
+        else {
+           navigate('/');
+        }
+
+      } else {
+         message.error("Đăng nhập thất bại. Sai email hoặc mật khẩu!");
       }
     } catch (error) {
       console.error("Login Error:", error);
+      message.error("Lỗi kết nối server.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-r from-blue-500 to-purple-600 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-[#f0f2f5] p-4 bg-[url('https://source.unsplash.com/random/1920x1080/?house')] bg-cover bg-center">
+      <div className="absolute inset-0 bg-black/40"></div>
+
       <Card 
-        className="w-full max-w-md shadow-2xl rounded-xl" 
-        variant="borderless" 
+        className="w-full max-w-md shadow-2xl rounded-xl relative z-10" 
+        bordered={false}
       >
-        <div className="text-center mb-8">
-          <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-            <LoginOutlined className="text-3xl text-blue-600" />
+        <div className="text-center mb-6">
+          <div className="flex justify-center mb-2">
+             <HomeFilled className="text-4xl text-[#f96302]" />
           </div>
-          <Title level={3} style={{ margin: 0 }}>Smart Rental System</Title>
-          <Text type="secondary">Cổng thông tin quản lý</Text>
+          <Title level={3} style={{ margin: 0, color: '#333' }}>Đăng Nhập</Title>
+          <Text type="secondary">Smart Rental System</Text>
         </div>
 
         <Form
@@ -65,7 +96,8 @@ const Login = () => {
           >
             <Input 
               prefix={<UserOutlined className="text-gray-400" />} 
-              placeholder="Email đăng nhập" 
+              placeholder="Email" 
+              className="rounded-md"
             />
           </Form.Item>
 
@@ -76,28 +108,43 @@ const Login = () => {
             <Input.Password 
               prefix={<LockOutlined className="text-gray-400" />} 
               placeholder="Mật khẩu" 
+              className="rounded-md"
             />
           </Form.Item>
+
+          <div className="flex justify-end mb-4">
+            <Link to="/forgot-password" style={{ fontSize: '14px', color: '#f96302' }}>
+                Quên mật khẩu?
+            </Link>
+          </div>
 
           <Form.Item>
             <Button 
               type="primary" 
               htmlType="submit" 
-              className="w-full bg-blue-600 hover:bg-blue-500 border-none h-12 font-bold text-lg rounded-lg"
+              className="w-full bg-[#f96302] hover:bg-orange-600 border-none h-11 font-bold text-lg rounded-md"
               loading={loading}
             >
               ĐĂNG NHẬP
             </Button>
           </Form.Item>
           
-          {/* --- CẬP NHẬT PHẦN NÀY --- */}
-          <div className="text-center mt-4 flex flex-col gap-2">
-            <Text type="secondary">Chưa có tài khoản?</Text>
-            <Link to="/register-landlord" className="text-green-600 font-bold hover:underline">
-               Đăng ký làm Chủ Trọ ngay!
-            </Link>
+          <Divider plain>Hoặc</Divider>
+
+          <div className="text-center flex flex-col gap-3">
+             <div className="text-sm">
+                Bạn chưa có tài khoản? <Link to="/register" className="text-blue-600 hover:underline font-medium">Đăng ký tìm phòng</Link>
+            </div>
+            
+            <div className="bg-orange-50 p-3 rounded-lg border border-orange-100 mt-2">
+                <Text type="secondary" className="text-xs">Bạn muốn đăng tin cho thuê?</Text>
+                <div className="mt-1">
+                    <Link to="/register-landlord" className="text-[#f96302] font-bold hover:underline flex items-center justify-center gap-1">
+                       Đăng ký làm Chủ Trọ ngay <HomeFilled />
+                    </Link>
+                </div>
+            </div>
           </div>
-          {/* ------------------------- */}
 
         </Form>
       </Card>

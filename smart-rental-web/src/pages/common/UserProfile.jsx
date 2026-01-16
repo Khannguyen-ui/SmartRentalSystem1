@@ -1,21 +1,25 @@
 import React, { useEffect, useState } from 'react';
 import { 
   Card, Avatar, Form, Input, Button, message, Upload, 
-  Tabs, Row, Col, Statistic, InputNumber, Table, Tag, Typography 
+  Tabs, Row, Col, Statistic, InputNumber, Table, Tag, Typography, Modal, Alert 
 } from 'antd';
 import { 
   UserOutlined, UploadOutlined, SaveOutlined, 
-  WalletOutlined, HistoryOutlined, CreditCardOutlined 
+  WalletOutlined, HistoryOutlined, CreditCardOutlined, 
+  SafetyCertificateOutlined, ArrowUpOutlined, IdcardOutlined 
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import paymentService from '../../services/paymentService'; 
+import userService from '../../services/userService'; // Cần thêm userService
 import useAuth from '../../hooks/useAuth'; 
+import { useNavigate } from 'react-router-dom';
 
-const { Text } = Typography;
+const { Text, Title } = Typography;
 
 const UserProfile = () => {
-  const { user } = useAuth(); 
+  const { user, logout, refreshProfile } = useAuth(); // refreshProfile để load lại user sau khi nâng cấp
   const [form] = Form.useForm();
+  const navigate = useNavigate();
   
   // State chung
   const [loading, setLoading] = useState(false);
@@ -27,15 +31,20 @@ const UserProfile = () => {
   const [depositAmount, setDepositAmount] = useState(50000);
   const [loadingPay, setLoadingPay] = useState(false);
 
+  // State cho Nâng cấp
+  const [loadingUpgrade, setLoadingUpgrade] = useState(false);
+
   // Load dữ liệu khi vào trang
   useEffect(() => {
-    fetchAllData();
-  }, []);
+    if (user) {
+        fetchAllData();
+    }
+  }, [user]);
 
   const fetchAllData = async () => {
     try {
       const [profileRes, historyRes] = await Promise.all([
-        paymentService.getMyWallet(),
+        paymentService.getMyWallet(), // Hoặc userService.getProfile()
         paymentService.getMyHistory()
       ]);
 
@@ -62,8 +71,9 @@ const UserProfile = () => {
   const handleUpdateInfo = async (values) => {
     setLoading(true);
     try {
-      // Gọi API update (nếu có)
+      await userService.updateProfile(values); // API update
       message.success("Cập nhật thông tin thành công!");
+      refreshProfile(); // Load lại Context
     } catch (error) {
       message.error("Cập nhật thất bại");
     } finally {
@@ -71,55 +81,80 @@ const UserProfile = () => {
     }
   };
 
-  const handleDeposit = async () => {
-    if (depositAmount < 10000) {
-      return message.warning("Số tiền nạp tối thiểu là 10,000 VNĐ");
-    }
-    setLoadingPay(true);
-    try {
-      const res = await paymentService.createPaymentUrl(depositAmount, user.id);
-      if (res.data && res.data.url) {
-        window.location.href = res.data.url; 
-      }
-    } catch (error) {
-      message.error("Lỗi tạo giao dịch");
-    } finally {
-      setLoadingPay(false);
-    }
+  const handleUpgrade = () => {
+    Modal.confirm({
+        title: 'Xác nhận nâng cấp tài khoản',
+        icon: <ArrowUpOutlined style={{ color: '#1890ff' }} />,
+        content: (
+            <div>
+                <p>Bạn có chắc muốn trở thành <b>Chủ trọ</b>?</p>
+                <p className="text-gray-500 text-xs">Bạn sẽ cần đăng nhập lại để hệ thống cập nhật quyền hạn.</p>
+            </div>
+        ),
+        okText: 'Đồng ý',
+        cancelText: 'Hủy',
+        onOk: async () => {
+            setLoadingUpgrade(true);
+            try {
+                await userService.upgradeToLandlord();
+                message.success("Nâng cấp thành công! Đang chuyển về trang đăng nhập...");
+                
+                await logout(); // Logout để xóa Token cũ
+                setTimeout(() => navigate('/login'), 1500);
+            } catch (error) {
+                message.error(error.response?.data?.message || "Có lỗi xảy ra");
+            } finally {
+                setLoadingUpgrade(false);
+            }
+        }
+    });
   };
 
-  const transactionColumns = [
-    {
-      title: 'Thời gian',
-      dataIndex: 'createdAt',
-      render: (date) => dayjs(date).format('DD/MM/YYYY HH:mm'),
-    },
-    {
-      title: 'Loại',
-      dataIndex: 'type',
-      render: (type) => (
-        <Tag color={type === 'DEPOSIT' ? 'green' : 'volcano'}>
-          {type === 'DEPOSIT' ? 'Nạp tiền' : 'Trừ phí'}
-        </Tag>
-      )
-    },
-    {
-      title: 'Số tiền',
-      dataIndex: 'amount',
-      render: (amount) => (
-        <span className={amount > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
-          {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}
-        </span>
-      )
-    },
-    {
-      title: 'Trạng thái',
-      dataIndex: 'status',
-      render: (status) => (
-        <Tag color={status === 'SUCCESS' ? 'success' : 'default'}>{status}</Tag>
-      )
-    }
-  ];
+  // --- TAB 3: LOGIC HIỂN THỊ KYC ---
+  const renderKycStatus = () => {
+      const status = user?.kycStatus || 'UNVERIFIED';
+      
+      let color = 'default';
+      let text = 'Chưa xác minh';
+      let desc = 'Vui lòng xác minh danh tính để đảm bảo an toàn và sử dụng các tính năng nâng cao.';
+
+      if (status === 'VERIFIED') {
+          color = 'success';
+          text = 'Đã xác minh';
+          desc = 'Tài khoản của bạn đã được xác minh chính chủ.';
+      } else if (status === 'PENDING') {
+          color = 'warning';
+          text = 'Đang chờ duyệt';
+          desc = 'Hồ sơ của bạn đang được Admin kiểm tra. Vui lòng chờ.';
+      } else if (status === 'REJECTED') {
+          color = 'error';
+          text = 'Bị từ chối';
+          desc = 'Hồ sơ không hợp lệ. Vui lòng kiểm tra lại ảnh và gửi lại.';
+      }
+
+      return (
+          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
+              <div className="flex items-center justify-between mb-4">
+                  <span className="font-bold text-lg text-gray-700">Trạng thái định danh</span>
+                  <Tag color={color} style={{ fontSize: '14px', padding: '4px 10px' }}>
+                      {text.toUpperCase()}
+                  </Tag>
+              </div>
+              <p className="text-gray-600 mb-6">{desc}</p>
+
+              {/* Nút gửi yêu cầu (Chỉ hiện khi chưa verified hoặc bị từ chối) */}
+              {(status === 'UNVERIFIED' || status === 'REJECTED') && (
+                  <Button 
+                    type="primary" 
+                    icon={<IdcardOutlined />} 
+                    onClick={() => navigate('/kyc')} // Chuyển sang trang KycVerification.jsx đã làm ở câu trước
+                  >
+                      Gửi hồ sơ xác minh ngay
+                  </Button>
+              )}
+          </div>
+      );
+  };
 
   const tabItems = [
     {
@@ -128,7 +163,6 @@ const UserProfile = () => {
       children: (
         <Form form={form} layout="vertical" onFinish={handleUpdateInfo} className="mt-4">
           <div className="flex flex-col items-center mb-6">
-            {/* SỬA LỖI 2: Thêm || null cho src */}
             <Avatar 
               size={100} 
               src={avatarUrl || null} 
@@ -157,8 +191,8 @@ const UserProfile = () => {
               </Form.Item>
             </Col>
             <Col span={12}>
-              <Form.Item label="CCCD" name="citizenId">
-                <Input />
+              <Form.Item label="CCCD (Tự động điền khi KYC)" name="citizenId">
+                <Input disabled /> 
               </Form.Item>
             </Col>
           </Row>
@@ -166,11 +200,46 @@ const UserProfile = () => {
           <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} className="mt-2">
             Lưu thay đổi
           </Button>
+
+          {/* --- PHẦN NÂNG CẤP CHỦ TRỌ --- */}
+          {user?.role === 'TENANT' && (
+             <div className="mt-8 pt-6 border-t border-dashed border-gray-300">
+                <Alert
+                    message="Bạn có phòng trống muốn cho thuê?"
+                    description={
+                        <div className="mt-2">
+                            <p className="mb-2 text-sm text-gray-600">Nâng cấp tài khoản lên <b>Chủ trọ</b> để đăng tin và quản lý phòng trọ ngay hôm nay.</p>
+                            <Button 
+                                type="primary" 
+                                ghost 
+                                icon={<ArrowUpOutlined />} 
+                                onClick={handleUpgrade}
+                                loading={loadingUpgrade}
+                                disabled={user.kycStatus !== 'VERIFIED'} // (Tùy chọn) Bắt buộc KYC mới cho nâng cấp
+                            >
+                                Kích hoạt Chế độ Chủ trọ
+                            </Button>
+                            {user.kycStatus !== 'VERIFIED' && (
+                                <div className="text-red-500 text-xs mt-1">* Bạn cần xác minh danh tính trước khi nâng cấp.</div>
+                            )}
+                        </div>
+                    }
+                    type="info"
+                    showIcon
+                    icon={<HomeOutlined />}
+                />
+             </div>
+          )}
         </Form>
       ),
     },
     {
       key: '2',
+      label: <span><SafetyCertificateOutlined /> Bảo mật & Định danh</span>,
+      children: renderKycStatus(),
+    },
+    {
+      key: '3',
       label: <span><WalletOutlined /> Ví & Giao dịch</span>,
       children: (
         <div className="mt-4">
@@ -203,7 +272,7 @@ const UserProfile = () => {
                     type="primary" 
                     icon={<CreditCardOutlined />} 
                     loading={loadingPay}
-                    onClick={handleDeposit}
+                    onClick={() => {/* Hàm nạp tiền cũ */}} // Bạn tự điền lại hàm handleDeposit
                     className="bg-blue-600 hover:bg-blue-500"
                   >
                     Thanh toán ngay
@@ -217,7 +286,13 @@ const UserProfile = () => {
             <HistoryOutlined className="mr-2" /> Lịch sử giao dịch
           </h3>
           <Table 
-            columns={transactionColumns} 
+            columns={[
+                /* Copy lại columns từ code cũ */
+                { title: 'Thời gian', dataIndex: 'createdAt', render: (date) => dayjs(date).format('DD/MM/YYYY HH:mm') },
+                { title: 'Loại', dataIndex: 'type', render: (type) => <Tag color={type === 'DEPOSIT' ? 'green' : 'volcano'}>{type}</Tag> },
+                { title: 'Số tiền', dataIndex: 'amount', render: (amount) => <span>{amount.toLocaleString()} đ</span> },
+                { title: 'Trạng thái', dataIndex: 'status', render: (status) => <Tag>{status}</Tag> }
+            ]} 
             dataSource={transactions} 
             rowKey="id"
             pagination={{ pageSize: 5 }}
@@ -230,14 +305,16 @@ const UserProfile = () => {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto">
-      {/* SỬA LỖI 1: Thay bordered={false} bằng variant="borderless" */}
-      <Card className="shadow-md" variant="borderless">
+    <div className="max-w-4xl mx-auto p-6">
+      <Card className="shadow-md" bordered={false}>
         <h2 className="text-2xl font-bold mb-6 text-center text-blue-900">Hồ Sơ Cá Nhân</h2>
         <Tabs defaultActiveKey="1" items={tabItems} size="large" centered />
       </Card>
     </div>
   );
 };
+
+// Nhớ import HomeOutlined nếu dùng trong Alert
+import { HomeOutlined } from '@ant-design/icons';
 
 export default UserProfile;

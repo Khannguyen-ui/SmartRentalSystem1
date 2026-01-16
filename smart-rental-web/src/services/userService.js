@@ -1,29 +1,58 @@
 import axiosClient from "../config/axiosClient";
 
 const userService = {
-  // 1. Lấy danh sách (GET)
-  getAllUsers: () => {
-    return axiosClient.get('/admin/users');
+  // ============================
+  // 1. THÔNG TIN CÁ NHÂN (PROFILE)
+  // ============================
+  // Lấy thông tin chính mình
+  getProfile: () => {
+    return axiosClient.get('/users/profile');
   },
 
-  // 2. Thêm mới (POST)
-  createUser: (data) => {
-    return axiosClient.post('/admin/users', data);
+  // Cập nhật thông tin chính mình
+  updateProfile: (data) => {
+    return axiosClient.put('/users/profile', data);
   },
 
-  // 3. Cập nhật thông tin (PUT)
-  updateUser: (id, data) => {
-    return axiosClient.put(`/admin/users/${id}`, data);
+  // Nâng cấp tài khoản lên chủ trọ
+  upgradeToLandlord: () => {
+    return axiosClient.post('/users/upgrade');
   },
 
-  // 4. Khóa/Mở khóa (PUT)
-  updateUserStatus: (userId) => {
-    return axiosClient.put(`/admin/users/${userId}/status`);
+  // ============================
+  // 2. XÁC MINH DANH TÍNH (KYC)
+  // ============================
+  // Upload file ảnh (Lên Cloudinary)
+  uploadFile: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosClient.post('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
   },
 
-  // 5. Xóa vĩnh viễn (DELETE)
-  deleteUser: (id) => {
-    return axiosClient.delete(`/admin/users/${id}`);
+  // Trích xuất thông tin CCCD (OCR/FPT.AI)
+  extractIdCard: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return axiosClient.post('/users/extract-id-card', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
+
+  // Gửi hồ sơ KYC để chờ duyệt
+  submitKyc: (data) => {
+    return axiosClient.post('/users/kyc', data);
+  },
+
+  // ============================
+  // 3. CÔNG KHAI (PUBLIC)
+  // ============================
+  // Lấy danh sách chủ trọ tiêu biểu
+  getTopLandlords: (lat, lng, radius = 20000) => {
+    return axiosClient.get('/users/top-landlords', { 
+        params: { lat, lng, radius } 
+    });
   }
 };
 
