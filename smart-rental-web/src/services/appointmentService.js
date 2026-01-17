@@ -1,23 +1,23 @@
-import axiosClient from "../config/axiosClient";
+import axiosClient from '../config/axiosClient';
 
 const appointmentService = {
-  // 1. Đặt lịch (POST /api/appointments)
-  createAppointment: (data) => {
-    return axiosClient.post("/appointments", data);
-  },
+    // Lấy danh sách lịch hẹn (Cho cả Tenant và Landlord)
+    // Backend tự check role trong Token để trả về data tương ứng
+    getMyCalendar: () => {
+        return axiosClient.get('/appointments/my-calendar');
+    },
 
-  // 2. Lấy danh sách lịch của tôi (GET /api/appointments/my-calendar)
-  getMyCalendar: () => {
-    return axiosClient.get("/appointments/my-calendar");
-  },
+    // Cập nhật trạng thái (Duyệt/Hủy)
+    updateStatus: (id, status) => {
+        return axiosClient.put(`/appointments/${id}/status`, null, {
+            params: { status } 
+        });
+    },
 
-  // 3. Cập nhật trạng thái (PUT /api/appointments/{id}/status)
-  // status: CONFIRMED, CANCELLED
-  updateStatus: (id, status) => {
-    return axiosClient.put(`/appointments/${id}/status`, null, {
-      params: { status }
-    });
-  }
+    // Tạo lịch hẹn mới (Dùng cho Modal đặt lịch ở trang trước)
+    create: (data) => {
+        return axiosClient.post('/appointments', data);
+    }
 };
 
 export default appointmentService;

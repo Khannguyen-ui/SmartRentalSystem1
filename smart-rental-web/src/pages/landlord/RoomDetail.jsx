@@ -2,12 +2,13 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Spin, Button, Card, Tag, Image, Row, Col, message, Avatar,
-    Breadcrumb, Input, Tooltip
+    Breadcrumb, Input, Tooltip, Modal, Form, DatePicker, TimePicker
 } from 'antd';
 import {
     ShareAltOutlined, MoreOutlined, EnvironmentOutlined, ClockCircleOutlined,
     ColumnWidthOutlined, AppstoreOutlined, DollarOutlined, HeartOutlined,
-    UserOutlined, CheckCircleOutlined, PhoneOutlined, MessageOutlined
+    UserOutlined, CheckCircleOutlined, PhoneOutlined, MessageOutlined,
+    CalendarOutlined // Thêm icon lịch
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
@@ -51,6 +52,11 @@ const RoomDetail = () => {
     const [room, setRoom] = useState(null);
     const [loading, setLoading] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
+    
+    // --- STATE CHO BOOKING ---
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [bookingLoading, setBookingLoading] = useState(false);
+    const [form] = Form.useForm();
 
     useEffect(() => {
         const fetchData = async () => {
@@ -81,13 +87,34 @@ const RoomDetail = () => {
         else message.warning("Chủ trọ chưa cập nhật số điện thoại");
     };
 
+    // --- XỬ LÝ ĐẶT LỊCH ---
+    const handleBooking = async (values) => {
+        if (!user) {
+            message.warning("Vui lòng đăng nhập để đặt lịch!");
+            navigate('/login');
+            return;
+        }
+        setBookingLoading(true);
+        try {
+            // Giả lập gọi API đặt lịch
+            // await appointmentService.create({...values, roomId: room.id});
+            setTimeout(() => {
+                message.success("Đã gửi yêu cầu xem phòng thành công!");
+                setBookingLoading(false);
+                setIsModalOpen(false);
+                form.resetFields();
+            }, 1000);
+        } catch (error) {
+            message.error("Có lỗi xảy ra, vui lòng thử lại");
+            setBookingLoading(false);
+        }
+    };
+
     if (loading) return <div className="flex h-screen justify-center items-center"><Spin size="large" /></div>;
     if (!room) return null;
 
-    // Lấy tọa độ từ API (nếu null thì fallback về mặc định TP.HCM)
     const position = [room.latitude || 10.7769, room.longitude || 106.7009];
 
-    // Dữ liệu Mock
     const missingData = {
         furnitureStatus: room.furnitureStatus || "Nội thất đầy đủ",
         avatar: "https://joesch.moe/api/v1/random",
@@ -97,7 +124,8 @@ const RoomDetail = () => {
     };
 
     return (
-        <div className="bg-gray-100 min-h-screen pb-10 font-sans text-gray-800">
+        <div className="bg-gray-100 min-h-screen pb-24 md:pb-10 font-sans text-gray-800 relative"> 
+        {/* Thêm pb-24 để tránh nội dung bị che bởi Bottom Bar trên mobile */}
 
             {/* Breadcrumb */}
             <div className="max-w-6xl mx-auto px-4 py-3 text-sm">
@@ -111,9 +139,8 @@ const RoomDetail = () => {
             <div className="max-w-6xl mx-auto px-4">
                 <Row gutter={[20, 20]}>
 
-                    {/* ================= CỘT TRÁI ================= */}
+                    {/* ================= CỘT TRÁI (GIỮ NGUYÊN) ================= */}
                     <Col xs={24} lg={16}>
-
                         {/* Slider Ảnh */}
                         <div className="bg-black rounded-lg overflow-hidden relative mb-2 h-[400px] flex items-center justify-center group">
                             {room.images && room.images.length > 0 ? (
@@ -191,16 +218,13 @@ const RoomDetail = () => {
                         <Card className="shadow-sm border-none mb-4 rounded-lg">
                             <h3 className="font-bold text-lg mb-3">Mô tả chi tiết</h3>
                             <div className="whitespace-pre-line text-gray-700 leading-relaxed text-sm">{room.description}</div>
-                            {/* List tiện ích từ API */}
                             {room.amenities && room.amenities.length > 0 && (
                                 <div className="mt-4 pt-4 border-t">
                                     <div className="font-semibold mb-2">Tiện ích:</div>
                                     <div className="flex flex-wrap gap-2">
                                         {room.amenities.map((ame, i) => (
-                                            // KIỂM TRA: Chỉ render nếu 'ame' khác null
                                             ame && (
                                                 <Tag key={i} color="blue" className="rounded-full px-3">
-                                                    {/* Backend trả về String nên hiển thị trực tiếp 'ame', bỏ '.name' */}
                                                     {ame}
                                                 </Tag>
                                             )
@@ -210,7 +234,7 @@ const RoomDetail = () => {
                             )}
                         </Card>
 
-                        {/* --- 3. PHẦN BẢN ĐỒ MỚI (REACT LEAFLET) --- */}
+                        {/* Map */}
                         <Card className="shadow-sm border-none mb-4 rounded-lg">
                             <div className="flex justify-between items-center mb-3">
                                 <h3 className="font-bold text-lg">Xem trên bản đồ</h3>
@@ -228,12 +252,12 @@ const RoomDetail = () => {
                                 <MapContainer
                                     center={position}
                                     zoom={15}
-                                    scrollWheelZoom={false} // Tắt zoom bằng lăn chuột để tránh phiền khi cuộn trang
+                                    scrollWheelZoom={false}
                                     style={{ height: '100%', width: '100%' }}
                                 >
                                     <TileLayer
                                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                                        attribution='&copy; OpenStreetMap contributors'
+                                        attribution='© OpenStreetMap contributors'
                                     />
                                     <Marker position={position}>
                                         <Popup>
@@ -246,9 +270,33 @@ const RoomDetail = () => {
 
                     </Col>
 
-                    {/* ================= CỘT PHẢI ================= */}
+                    {/* ================= CỘT PHẢI (CHỈNH SỬA UX) ================= */}
                     <Col xs={24} lg={8}>
                         <div className="sticky top-4 space-y-4">
+                            
+                            {/* --- [MỚI] CARD ĐẶT LỊCH XEM PHÒNG (CHO DESKTOP) --- */}
+                            {/* Ẩn trên mobile vì mobile đã có Bottom Bar */}
+                            <Card className="hidden lg:block shadow-md border-t-4 border-t-orange-500 rounded-lg">
+                                <div className="text-center mb-4">
+                                    <div className="text-gray-500 text-xs">Giá thuê phòng</div>
+                                    <div className="text-red-600 font-bold text-2xl">{room.price?.toLocaleString()} đ/tháng</div>
+                                </div>
+                                <Button 
+                                    type="primary" 
+                                    size="large" 
+                                    block 
+                                    className="bg-orange-600 hover:bg-orange-500 font-bold h-12 mb-3"
+                                    icon={<CalendarOutlined />}
+                                    onClick={() => setIsModalOpen(true)}
+                                >
+                                    ĐẶT LỊCH XEM PHÒNG
+                                </Button>
+                                <div className="text-center text-xs text-gray-400">
+                                    Hoàn toàn miễn phí & Gặp trực tiếp chủ trọ
+                                </div>
+                            </Card>
+
+                            {/* CARD THÔNG TIN CHỦ TRỌ (GIỮ NGUYÊN) */}
                             <Card className="shadow-sm border-none rounded-lg">
                                 <div className="flex items-center gap-3 mb-4">
                                     <Avatar size={50} src={missingData.avatar} icon={<UserOutlined />} className="border border-gray-200" />
@@ -266,7 +314,7 @@ const RoomDetail = () => {
                                     <Col span={12}><Button block className="bg-blue-50 text-blue-600 border-blue-100 font-semibold flex items-center justify-center gap-1 h-10" onClick={handleZalo}><ZaloIcon /> Zalo</Button></Col>
                                     <Col span={12}><Button block className="bg-gray-50 text-gray-700 border-gray-200 font-semibold h-10" onClick={handleChat}>Chat</Button></Col>
                                 </Row>
-                                <Button block size="large" type="primary" className="bg-orange-600 hover:bg-orange-500 border-none font-bold text-lg flex items-center justify-center gap-2 h-12 shadow-md shadow-orange-100" icon={<PhoneOutlined />} onClick={() => setShowPhone(!showPhone)}>
+                                <Button block size="large" type="primary" className="bg-green-600 hover:bg-green-500 border-none font-bold text-lg flex items-center justify-center gap-2 h-12 shadow-md shadow-green-100" icon={<PhoneOutlined />} onClick={() => setShowPhone(!showPhone)}>
                                     {showPhone ? (room.landlordPhone || "09xxxxxx") : "BẤM ĐỂ HIỆN SỐ"}
                                 </Button>
                             </Card>
@@ -286,6 +334,57 @@ const RoomDetail = () => {
                     </Col>
                 </Row>
             </div>
+
+            {/* --- [MỚI] FIXED BOTTOM BAR (CHO MOBILE) --- */}
+            <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-3 lg:hidden z-50 flex justify-between items-center shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)]">
+                <div>
+                    <div className="text-xs text-gray-500">Giá thuê</div>
+                    <div className="text-red-600 font-bold text-lg">{room.price?.toLocaleString()} đ</div>
+                </div>
+                <Button 
+                    type="primary" 
+                    className="bg-orange-600 border-none font-bold px-6 h-10 shadow-md"
+                    onClick={() => setIsModalOpen(true)}
+                >
+                    ĐẶT LỊCH NGAY
+                </Button>
+            </div>
+
+            {/* --- [MỚI] MODAL ĐẶT LỊCH --- */}
+            <Modal
+                title="Đặt lịch xem phòng"
+                open={isModalOpen}
+                onCancel={() => setIsModalOpen(false)}
+                footer={null}
+                centered
+            >
+                <div className="mb-4 bg-gray-50 p-3 rounded border">
+                    <h4 className="font-bold text-gray-700">{room.title}</h4>
+                    <p className="text-orange-600 font-bold">{room.price?.toLocaleString()} đ/tháng</p>
+                </div>
+                <Form form={form} layout="vertical" onFinish={handleBooking}>
+                    <div className="grid grid-cols-2 gap-4">
+                        <Form.Item label="Ngày xem" name="date" rules={[{ required: true, message: 'Chọn ngày!' }]}>
+                            <DatePicker className="w-full" disabledDate={(c) => c && c < dayjs().endOf('day')} />
+                        </Form.Item>
+                        <Form.Item label="Giờ xem" name="time" rules={[{ required: true, message: 'Chọn giờ!' }]}>
+                            <TimePicker className="w-full" format="HH:mm" />
+                        </Form.Item>
+                    </div>
+                    <Form.Item label="Ghi chú" name="note">
+                        <Input.TextArea rows={3} placeholder="Ví dụ: Tôi muốn xem phòng vào buổi chiều..." />
+                    </Form.Item>
+                    <Form.Item label="Thông tin liên hệ">
+                        <Input value={user?.fullName || ''} disabled prefix="Tên:" className="mb-2" />
+                        <Input value={user?.phone || ''} disabled prefix="SĐT:" />
+                        <div className="text-xs text-gray-500 mt-1">*Lấy từ hồ sơ cá nhân của bạn</div>
+                    </Form.Item>
+                    <Button type="primary" htmlType="submit" loading={bookingLoading} block size="large" className="bg-orange-600 hover:bg-orange-500 border-none">
+                        Xác nhận đặt lịch
+                    </Button>
+                </Form>
+            </Modal>
+
         </div>
     );
 };

@@ -6,11 +6,12 @@ import {
 import { 
   UserOutlined, UploadOutlined, SaveOutlined, 
   WalletOutlined, HistoryOutlined, CreditCardOutlined, 
-  SafetyCertificateOutlined, ArrowUpOutlined, IdcardOutlined 
+  SafetyCertificateOutlined, ArrowUpOutlined, IdcardOutlined,
+  HomeOutlined // Import HomeOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import paymentService from '../../services/paymentService'; 
-import userService from '../../services/userService'; // Cần thêm userService
+import userService from '../../services/userService'; 
 import useAuth from '../../hooks/useAuth'; 
 import { useNavigate } from 'react-router-dom';
 
@@ -82,6 +83,17 @@ const UserProfile = () => {
   };
 
   const handleUpgrade = () => {
+    // --- BỔ SUNG: CHẶN NẾU CHƯA KYC ---
+    if (user?.kycStatus !== 'VERIFIED') {
+        Modal.warning({
+            title: 'Chưa xác minh danh tính',
+            content: 'Vui lòng hoàn tất xác minh danh tính (tab Bảo mật & Định danh) trước khi nâng cấp tài khoản.',
+            okText: 'Đã hiểu'
+        });
+        return; // Dừng lại ngay
+    }
+    // ----------------------------------
+
     Modal.confirm({
         title: 'Xác nhận nâng cấp tài khoản',
         icon: <ArrowUpOutlined style={{ color: '#1890ff' }} />,
@@ -215,7 +227,7 @@ const UserProfile = () => {
                                 icon={<ArrowUpOutlined />} 
                                 onClick={handleUpgrade}
                                 loading={loadingUpgrade}
-                                disabled={user.kycStatus !== 'VERIFIED'} // (Tùy chọn) Bắt buộc KYC mới cho nâng cấp
+                                disabled={user.kycStatus !== 'VERIFIED'} // Bắt buộc KYC mới cho nâng cấp
                             >
                                 Kích hoạt Chế độ Chủ trọ
                             </Button>
@@ -313,8 +325,5 @@ const UserProfile = () => {
     </div>
   );
 };
-
-// Nhớ import HomeOutlined nếu dùng trong Alert
-import { HomeOutlined } from '@ant-design/icons';
 
 export default UserProfile;

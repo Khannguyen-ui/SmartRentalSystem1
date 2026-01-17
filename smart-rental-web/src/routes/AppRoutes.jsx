@@ -4,6 +4,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 
 // Layouts
 import MainLayout from '../components/layout/MainLayout';
+import PublicLayout from '../components/layout/PublicLayout';
 import ProtectedRoute from './ProtectedRoute';
 
 // --- IMPORTS CÁC TRANG ---
@@ -28,72 +29,87 @@ import LandlordFinance from '../pages/landlord/LandlordFinance';
 // Common
 import UserProfile from '../pages/common/UserProfile';
 import NotFound from '../pages/common/NotFound';
-import PublicLayout from '../components/layout/PublicLayout';
 import HomePage from '../pages/public/HomePage';
 import SearchMap from '../pages/common/SearchMap';
 import FilterPage from '../pages/common/FilterPage';
-// 1. IMPORT TRANG KYC
 import KycVerification from '../pages/common/KycVerification';
+
+// Tenant (Giả sử bạn có trang này, nếu chưa có thì có thể comment lại)
+// import TenantSchedule from '../pages/tenant/TenantSchedule'; 
 
 const AppRoutes = () => {
     return (
         <Routes>
-            {/* 1. ROUTE DÀNH RIÊNG CHO ADMIN LOGIN */}
-            <Route path="/admin/login" element={<AdminLogin />} />
-
-            {/* 2. PUBLIC ROUTES */}
+            {/* ========================================================= */}
+            {/* 1. PUBLIC ROUTES (Ai cũng vào được)                       */}
+            {/* ========================================================= */}
             <Route element={<PublicLayout />}>
                 <Route path="/" element={<HomePage />} />
                 <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
+                <Route path="/register-landlord" element={<RegisterLandlord />} />
                 
-                {/* --- 2. SỬA LẠI PHẦN ĐĂNG KÝ (TRÁNH TRÙNG PATH) --- */}
-                <Route path="/register" element={<Register />} /> {/* Đăng ký người thuê */}
-                <Route path="/register-landlord" element={<RegisterLandlord />} /> {/* Đăng ký chủ trọ */}
-                {/* -------------------------------------------------- */}
-
-                <Route path="/rooms/:id" element={<RoomDetail />} />
+                {/* Trang tìm kiếm, chi tiết phòng (Public xem được) */}
                 <Route path="/search" element={<SearchMap />} />
                 <Route path="/filter" element={<FilterPage />} />
+                <Route path="/rooms/:id" element={<RoomDetail />} />
+                
+                {/* Route Admin Login (Tách riêng để bảo mật hơn nếu cần) */}
+                <Route path="/admin/login" element={<AdminLogin />} />
             </Route>
 
-            {/* --- AUTHENTICATED ROUTES --- */}
+            {/* ========================================================= */}
+            {/* 2. AUTHENTICATED COMMON ROUTES (Đã login là vào được)     */}
+            {/* Dành cho: TENANT, LANDLORD, ADMIN                      */}
+            {/* ========================================================= */}
+            <Route element={<ProtectedRoute allowedRoles={['TENANT', 'LANDLORD', 'ADMIN']} />}>
+                <Route element={<MainLayout />}>
+                    {/* Hồ sơ cá nhân (Quan trọng: Ai cũng có Profile) */}
+                    <Route path="/profile" element={<UserProfile />} />
 
-            {/* 1. Route chung (Profile, KYC) - Dành cho tất cả user đã đăng nhập */}
-            <Route element={<ProtectedRoute allowedRoles={['LANDLORD', 'TENANT']} />}>
-                <Route path="/" element={<MainLayout />}>
-                    <Route path="profile" element={<UserProfile />} />
-                    
-                    {/* 3. THÊM ROUTE KYC VÀO ĐÂY */}
-                    <Route path="kyc" element={<KycVerification />} />
-                    
+                    {/* Xác thực danh tính (Quan trọng: Ai cũng cần KYC) */}
+                    <Route path="/kyc" element={<KycVerification />} />
                 </Route>
             </Route>
 
-            {/* 2. Khu vực ADMIN */}
+            {/* ========================================================= */}
+            {/* 3. TENANT ROUTES (Chỉ KHÁCH THUÊ)                         */}
+            {/* ========================================================= */}
+            <Route element={<ProtectedRoute allowedRoles={['TENANT']} />}>
+                <Route path="/tenant" element={<MainLayout />}>
+                    {/* <Route path="schedule" element={<TenantSchedule />} /> Ví dụ: Lịch hẹn của tôi */}
+                    {/* Thêm các route khác của khách thuê tại đây */}
+                </Route>
+            </Route>
+
+            {/* ========================================================= */}
+            {/* 4. LANDLORD ROUTES (Chỉ CHỦ TRỌ)                          */}
+            {/* ========================================================= */}
+            <Route element={<ProtectedRoute allowedRoles={['LANDLORD']} />}>
+                <Route path="/landlord" element={<MainLayout />}>
+                    <Route index element={<Navigate to="room-list" />} />
+                    
+                    <Route path="dashboard" element={<div>Thống kê chủ trọ</div>} />
+                    <Route path="create-room" element={<CreateRoom />} />
+                    <Route path="room-list" element={<MyRooms />} />
+                    <Route path="appointments" element={<AppointmentManagement />} />
+                    <Route path="finance" element={<LandlordFinance />} />
+                    
+                    {/* ❌ Đừng để profile ở đây nữa */}
+                </Route>
+            </Route>
+
+            {/* ========================================================= */}
+            {/* 5. ADMIN ROUTES (Chỉ QUẢN TRỊ VIÊN)                       */}
+            {/* ========================================================= */}
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                 <Route path="/admin" element={<MainLayout />}>
                     <Route index element={<Navigate to="approve-rooms" />} />
-                    <Route path="dashboard" element={<div>Trang Thống Kê (Đang phát triển)</div>} />
+                    
+                    <Route path="dashboard" element={<div>Trang Thống Kê</div>} />
                     <Route path="approve-rooms" element={<RoomApprove />} />
                     <Route path="master-data" element={<MasterData />} />
                     <Route path="users" element={<UserManagement />} />
-                </Route>
-            </Route>
-
-            {/* 3. Khu vực LANDLORD */}
-            <Route element={<ProtectedRoute allowedRoles={['LANDLORD']} />}>
-                <Route path="/landlord" element={<MainLayout />}>
-                    {/* Điều hướng mặc định về danh sách tin */}
-                    <Route index element={<Navigate to="room-list" />} />
-
-                    <Route path="dashboard" element={<div>Thống kê chủ trọ (Đang phát triển)</div>} />
-                    <Route path="create-room" element={<CreateRoom />} />
-
-                    {/* Danh sách tin đăng */}
-                    <Route path="room-list" element={<MyRooms />} />
-
-                    <Route path="appointments" element={<AppointmentManagement />} />
-                    <Route path="finance" element={<LandlordFinance />} />
                 </Route>
             </Route>
 
