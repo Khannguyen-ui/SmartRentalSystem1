@@ -1,4 +1,3 @@
-// src/routes/AppRoutes.jsx
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 
@@ -19,7 +18,7 @@ import RoomApprove from '../pages/admin/RoomApprove';
 import MasterData from '../pages/admin/MasterData';
 import UserManagement from '../pages/admin/UserManagement';
 
-// Landlord
+// Landlord (Và dùng chung cho Tenant ở một số trang)
 import CreateRoom from '../pages/landlord/CreateRoom';
 import MyRooms from '../pages/landlord/MyRooms';
 import AppointmentManagement from '../pages/landlord/AppointmentManagement';
@@ -33,9 +32,7 @@ import HomePage from '../pages/public/HomePage';
 import SearchMap from '../pages/common/SearchMap';
 import FilterPage from '../pages/common/FilterPage';
 import KycVerification from '../pages/common/KycVerification';
-
-// Tenant (Giả sử bạn có trang này, nếu chưa có thì có thể comment lại)
-// import TenantSchedule from '../pages/tenant/TenantSchedule'; 
+import NotificationPage from '../pages/common/NotificationPage'; // <--- IMPORT MỚI
 
 const AppRoutes = () => {
     return (
@@ -54,7 +51,7 @@ const AppRoutes = () => {
                 <Route path="/filter" element={<FilterPage />} />
                 <Route path="/rooms/:id" element={<RoomDetail />} />
                 
-                {/* Route Admin Login (Tách riêng để bảo mật hơn nếu cần) */}
+                {/* Route Admin Login */}
                 <Route path="/admin/login" element={<AdminLogin />} />
             </Route>
 
@@ -64,11 +61,14 @@ const AppRoutes = () => {
             {/* ========================================================= */}
             <Route element={<ProtectedRoute allowedRoles={['TENANT', 'LANDLORD', 'ADMIN']} />}>
                 <Route element={<MainLayout />}>
-                    {/* Hồ sơ cá nhân (Quan trọng: Ai cũng có Profile) */}
+                    {/* Hồ sơ cá nhân */}
                     <Route path="/profile" element={<UserProfile />} />
 
-                    {/* Xác thực danh tính (Quan trọng: Ai cũng cần KYC) */}
+                    {/* Xác thực danh tính */}
                     <Route path="/kyc" element={<KycVerification />} />
+
+                    {/* --- [MỚI] Trang Thông báo dùng chung --- */}
+                    <Route path="/notifications" element={<NotificationPage />} />
                 </Route>
             </Route>
 
@@ -77,8 +77,9 @@ const AppRoutes = () => {
             {/* ========================================================= */}
             <Route element={<ProtectedRoute allowedRoles={['TENANT']} />}>
                 <Route path="/tenant" element={<MainLayout />}>
-                    {/* <Route path="schedule" element={<TenantSchedule />} /> Ví dụ: Lịch hẹn của tôi */}
-                    {/* Thêm các route khác của khách thuê tại đây */}
+                    {/* --- [MỚI] Tái sử dụng Component quản lý lịch hẹn --- */}
+                    {/* Component này đã được sửa để tự nhận diện là Tenant (Tab 'Tôi đi hẹn') */}
+                    <Route path="appointments" element={<AppointmentManagement />} />
                 </Route>
             </Route>
 
@@ -94,8 +95,6 @@ const AppRoutes = () => {
                     <Route path="room-list" element={<MyRooms />} />
                     <Route path="appointments" element={<AppointmentManagement />} />
                     <Route path="finance" element={<LandlordFinance />} />
-                    
-                    {/* ❌ Đừng để profile ở đây nữa */}
                 </Route>
             </Route>
 

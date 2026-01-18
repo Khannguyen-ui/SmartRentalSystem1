@@ -11,7 +11,7 @@ const { Header, Content } = Layout;
 const MainLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  
+
   // State đếm số thông báo chưa đọc
   const [unreadCount, setUnreadCount] = useState(0);
 
@@ -58,26 +58,24 @@ const MainLayout = () => {
 
   // Xử lý khi bấm vào chuông thông báo
   const handleNotificationClick = () => {
-    if (user?.role === 'LANDLORD') {
-      navigate('/landlord/finance'); // Chủ trọ thì qua trang Tài chính/Thông báo
-    } else {
-      // Nếu là Admin hoặc Tenant thì xử lý khác (hoặc tạo trang riêng)
-      navigate('/notifications'); 
-    }
+    // Bất kể là ai (Tenant hay Landlord) đều vào trang thông báo chung này
+    // Vì LandlordFinance chỉ quản lý tiền, còn đây là thông báo lịch hẹn, hệ thống...
+    navigate('/notifications');
   };
+
 
   return (
     <Layout className="min-h-screen">
       {/* Sidebar bên trái */}
       <Sidebar />
-      
+
       <Layout>
         {/* Header ở trên cùng */}
         <Header className="bg-white flex justify-end items-center px-6 shadow-sm sticky top-0 z-10">
           <Space size="large">
-            
+
             {/* 1. Icon Thông báo */}
-            <div 
+            <div
               className="cursor-pointer flex items-center hover:bg-gray-100 p-2 rounded-full transition-colors"
               onClick={handleNotificationClick}
             >
@@ -89,8 +87,8 @@ const MainLayout = () => {
             {/* 2. Avatar & Dropdown Menu */}
             <Dropdown menu={{ items: userMenuItems }} placement="bottomRight" trigger={['click']}>
               <Space className="cursor-pointer hover:bg-gray-50 p-2 rounded transition-colors">
-                <Avatar 
-                  icon={<UserOutlined />} 
+                <Avatar
+                  icon={<UserOutlined />}
                   src={user?.avatarUrl} // Sửa thành avatarUrl cho khớp với API UserEntity
                   className="bg-blue-500"
                 />

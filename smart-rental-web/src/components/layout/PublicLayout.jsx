@@ -1,17 +1,38 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // Thêm useState, useEffect
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { Button, Dropdown, Space, Avatar, Badge, message, Modal } from 'antd';
 import { 
   UserOutlined, LogoutOutlined, HistoryOutlined, HomeOutlined, 
   HeartOutlined, MessageOutlined, BellOutlined, PlusCircleOutlined,
-  ExclamationCircleOutlined, IdcardOutlined // Thêm icon ID Card cho Modal KYC
+  ExclamationCircleOutlined, IdcardOutlined 
 } from '@ant-design/icons';
 import useAuth from '../../hooks/useAuth';
 import userService from '../../services/userService'; 
+import notificationService from '../../services/notificationService'; // Import Service thông báo
 
 const PublicLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+
+  // --- THÊM STATE ĐẾM THÔNG BÁO ---
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // --- GỌI API LẤY SỐ LƯỢNG KHI CÓ USER ---
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+        if (!user) return;
+        try {
+            const res = await notificationService.getMyNotifications();
+            if (res.data) {
+                const count = res.data.filter(n => !n.isRead).length;
+                setUnreadCount(count);
+            }
+        } catch (error) {
+            console.error("Lỗi thông báo:", error);
+        }
+    };
+    fetchUnreadCount();
+  }, [user]);
 
   // Xử lý khi nhấn nút Đăng tin
   const handlePostAd = () => {
@@ -24,16 +45,15 @@ const PublicLayout = () => {
 
     // 2. Kiểm tra Role
     if (user.role === 'LANDLORD') {
-      // Nếu là Chủ trọ -> Cho phép vào trang đăng tin
       navigate('/landlord/create-room');
     } else if (user.role === 'ADMIN') {
       message.warning("Admin không đăng tin trực tiếp.");
     } else {
       // 3. Trường hợp là Tenant (Khách thuê)
-            if (user.kycStatus !== 'VERIFIED') {
+      if (user.kycStatus !== 'VERIFIED') {
         Modal.confirm({
           title: 'Yêu cầu xác minh danh tính',
-          icon: <IdcardOutlined style={{ color: '#faad14' }} />, // Icon màu vàng cảnh báo
+          icon: <IdcardOutlined style={{ color: '#faad14' }} />, 
           content: (
             <div>
               <p>Để đảm bảo tin cậy, bạn cần <b>xác minh danh tính (eKYC)</b> trước khi có thể đăng tin cho thuê.</p>
@@ -42,14 +62,11 @@ const PublicLayout = () => {
           ),
           okText: 'Xác minh ngay',
           cancelText: 'Để sau',
-          onOk: () => {
-            navigate('/kyc'); // Chuyển hướng sang trang KYC
-          }
+          onOk: () => navigate('/kyc')
         });
-        return; // Dừng hàm lại, không chạy logic nâng cấp bên dưới
+        return; 
       }
 
-      // --- BƯỚC 3.2: NẾU ĐÃ KYC -> GỢI Ý NÂNG CẤP ---
       Modal.confirm({
         title: 'Kích hoạt quyền Chủ trọ',
         icon: <ExclamationCircleOutlined />,
@@ -58,14 +75,10 @@ const PublicLayout = () => {
         cancelText: 'Để sau',
         onOk: async () => {
             try {
-                [cite_start]// Gọi API nâng cấp quyền [cite: 1221]
                 await userService.upgradeToLandlord();
-                message.success("Nâng cấp thành công! Vui lòng đăng nhập lại để hệ thống cập nhật quyền.");
-                
-                // Đăng xuất để user đăng nhập lại nhận role mới
+                message.success("Nâng cấp thành công! Vui lòng đăng nhập lại.");
                 logout(); 
             } catch (error) {
-                console.error(error);
                 message.error("Lỗi nâng cấp: " + (error.response?.data?.message || "Vui lòng thử lại sau"));
             }
         }
@@ -74,43 +87,16 @@ const PublicLayout = () => {
   };
 
   const userMenu = [
-    // Menu cho Tenant
     ...(user?.role === 'TENANT' ? [
-      {
-        key: '1',
-        label: <Link to="/tenant/schedule">Lịch hẹn của tôi</Link>,
-        icon: <HistoryOutlined />,
-      },
-      {
-        key: '2',
-        label: <Link to="/tenant/contracts">Hợp đồng của tôi</Link>,
-        icon: <HistoryOutlined />,
-      }
+      { key: '1', label: <Link to="/tenant/schedule">Lịch hẹn của tôi</Link>, icon: <HistoryOutlined /> },
+      { key: '2', label: <Link to="/tenant/contracts">Hợp đồng của tôi</Link>, icon: <HistoryOutlined /> }
     ] : []),
-    
-    // Menu cho Landlord
     ...(user?.role === 'LANDLORD' ? [
-        {
-          key: 'landlord-1',
-          label: <Link to="/landlord/rooms">Quản lý phòng trọ</Link>,
-          icon: <HomeOutlined />,
-        },
-        {
-            key: 'landlord-2',
-            label: <Link to="/landlord/appointments">Lịch hẹn xem phòng</Link>,
-            icon: <HistoryOutlined />,
-        }
+        { key: 'landlord-1', label: <Link to="/landlord/room-list">Quản lý phòng trọ</Link>, icon: <HomeOutlined /> },
+        { key: 'landlord-2', label: <Link to="/landlord/appointments">Lịch hẹn xem phòng</Link>, icon: <HistoryOutlined /> }
     ] : []),
-
-    {
-      type: 'divider',
-    },
-    {
-      key: 'logout',
-      label: <span onClick={logout}>Đăng xuất</span>,
-      icon: <LogoutOutlined />,
-      danger: true,
-    },
+    { type: 'divider' },
+    { key: 'logout', label: <span onClick={logout}>Đăng xuất</span>, icon: <LogoutOutlined />, danger: true },
   ];
 
   return (
@@ -128,18 +114,24 @@ const PublicLayout = () => {
             
             {/* Các icon tiện ích (Chỉ hiện khi đã đăng nhập) */}
             {user && (
-                <div className="hidden md:flex gap-4 mr-2">
+                <div className="hidden md:flex gap-4 mr-2 items-center">
                     <HeartOutlined className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer"/>
                     <MessageOutlined className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer"/>
-                    <Badge count={7} size="small">
-                        <BellOutlined className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer"/>
-                    </Badge>
+                    
+                    {/* --- CẬP NHẬT PHẦN ICON THÔNG BÁO --- */}
+                    <div 
+                        className="cursor-pointer flex items-center"
+                        onClick={() => navigate('/notifications')} // Bấm vào là chuyển trang
+                    >
+                        <Badge count={unreadCount} size="small" offset={[0, -5]}>
+                            <BellOutlined className="text-xl text-gray-600 hover:text-[#f96302]"/>
+                        </Badge>
+                    </div>
+                    {/* ------------------------------------ */}
                 </div>
             )}
 
             {/* --- PHẦN TÁCH BIỆT CHO CHỦ TRỌ --- */}
-            
-            {/* Nút Quản lý tin (Chỉ hiện cho Landlord) */}
             {user?.role === 'LANDLORD' && (
                 <Link to="/landlord/room-list">
                     <Button className="rounded-full font-medium border-gray-300 hover:border-[#f96302] hover:text-[#f96302]">
@@ -148,7 +140,7 @@ const PublicLayout = () => {
                 </Link>
             )}
 
-            {/* Nút Đăng Tin (Luôn hiện để kích thích user click vào) */}
+            {/* Nút Đăng Tin */}
             <Button 
                 type="primary" 
                 className="bg-black hover:bg-gray-800 border-none rounded-full font-bold px-6"
@@ -158,11 +150,11 @@ const PublicLayout = () => {
                 Đăng tin
             </Button>
 
-            {/* User Dropdown hoặc Nút Đăng nhập/Đăng ký */}
+            {/* User Dropdown */}
             {user ? (
               <Dropdown menu={{ items: userMenu }} placement="bottomRight">
                 <Space className="cursor-pointer hover:bg-gray-100 p-1 pr-3 rounded-full transition border border-gray-200">
-                  <Avatar src={user.avatar} icon={<UserOutlined />} className="bg-orange-500" />
+                  <Avatar src={user.avatarUrl || user.avatar} icon={<UserOutlined />} className="bg-orange-500" />
                   <span className="hidden md:inline font-medium text-gray-700 max-w-[100px] truncate">
                     {user.fullName}
                   </span>
@@ -173,7 +165,6 @@ const PublicLayout = () => {
                 <Link to="/login">
                   <Button type="text" className="font-medium hover:bg-gray-100 rounded-full">Đăng nhập</Button>
                 </Link>
-                {/* Nút đăng ký cho Landlord tách riêng nếu chưa có tk */}
                 <Link to="/register-landlord">
                   <Button type="text" className="font-medium hover:bg-gray-100 rounded-full">Đăng ký Chủ trọ</Button>
                 </Link>
