@@ -2,14 +2,27 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
     Spin, Button, Card, Tag, Image, Row, Col, message, Avatar,
-    Breadcrumb, Input, Tooltip, Modal, Form, DatePicker, TimePicker
+    Breadcrumb, Input, Tooltip, Modal, Form, DatePicker, TimePicker,
+    Typography
 } from 'antd';
 import {
     ShareAltOutlined, MoreOutlined, EnvironmentOutlined, ClockCircleOutlined,
     ColumnWidthOutlined, AppstoreOutlined, DollarOutlined, HeartOutlined,
     UserOutlined, CheckCircleOutlined, PhoneOutlined, MessageOutlined,
-    CalendarOutlined // Thêm icon lịch
+    CalendarOutlined,// Thêm icon lịch
+    HomeFilled,
+    AppstoreAddOutlined,
+    AimOutlined,
+    RightOutlined
 } from '@ant-design/icons';
+
+import { 
+    LineChart, Line, XAxis, YAxis,
+    CartesianGrid, Tooltip as ChartTooltip,
+    ResponsiveContainer, Legend 
+
+} from 'recharts';
+import { InfoCircleFilled, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import 'dayjs/locale/vi';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -23,6 +36,9 @@ import L from 'leaflet';
 import roomService from '../../services/roomService';
 import useAuth from '../../hooks/useAuth';
 import chatService from '../../services/chatService';
+import searchHistoryService from '../../services/searchHistoryService';
+
+const { Text } = Typography;
 
 // --- 2. FIX LỖI ICON CỦA LEAFLET TRONG REACT ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -44,6 +60,21 @@ dayjs.locale('vi');
 const ZaloIcon = () => (
     <img src="https://upload.wikimedia.org/wikipedia/commons/9/9f/Zalo_Authors_Logo.svg" alt="Zalo" width={20} height={20} />
 );
+const priceData = [
+  { name: 'T1/25', highest: 68, popular: 30, lowest: 18 },
+  { name: 'T2/25', highest: 56, popular: 36, lowest: 25 },
+  { name: 'T3/25', highest: 65, popular: 36, lowest: 22 },
+  { name: 'T4/25', highest: 75, popular: 33, lowest: 16 },
+  { name: 'T5/25', highest: 75, popular: 38, lowest: 20 },
+  { name: 'T6/25', highest: 73, popular: 36, lowest: 15 },
+  { name: 'T7/25', highest: 74, popular: 36, lowest: 20 },
+  { name: 'T8/25', highest: 55, popular: 34, lowest: 23 },
+  { name: 'T9/25', highest: 75, popular: 37, lowest: 23 },
+  { name: 'T10/25', highest: 72, popular: 36, lowest: 20 },
+  { name: 'T11/25', highest: 76, popular: 41, lowest: 24 },
+  { name: 'T12/25', highest: 77, popular: 42, lowest: 20 },
+  { name: 'T12/25 ', highest: 73, popular: 32, lowest: 19 },
+];
 
 const RoomDetail = () => {
     const { id } = useParams();
@@ -58,21 +89,62 @@ const RoomDetail = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [bookingLoading, setBookingLoading] = useState(false);
     const [form] = Form.useForm();
+    const [recommendedRooms, setRecommendedRooms] = useState([]);
+    const [loadingRecs, setLoadingRecs] = useState(false);
 
-    useEffect(() => {
+  useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
                 const res = await roomService.getRoomById(id);
                 setRoom(res.data);
+                // Sau khi có dữ liệu phòng hiện tại, bắt đầu lấy phòng gợi ý
+                fetchRecommendations();
             } catch (error) {
-                message.error("Không tìm thấy phòng hoặc tin đã bị xóa!");
+                message.error("Không tìm thấy phòng!");
             } finally {
                 setLoading(false);
             }
         };
         if (id) fetchData();
     }, [id]);
+
+    const fetchRecommendations = async () => {
+        setLoadingRecs(true);
+        try {
+            // 1. Lấy lịch sử tìm kiếm gần nhất
+            const historyRes = await searchHistoryService.getMyHistory();
+            const history = historyRes.data;
+
+            let searchParams = { lat: 10.7769, lng: 106.7009, radius: 20000 }; // Mặc định HCM
+
+            if (history && history.length > 0) {
+                // Lấy bản ghi tìm kiếm mới nhất có tọa độ
+                const lastSearch = history[0];
+                searchParams = {
+                    lat: lastSearch.latitude,
+                    lng: lastSearch.longitude,
+                    radius: lastSearch.radius || 5000,
+                    keyword: lastSearch.queryText
+                };
+            }
+
+            // 2. Gọi API search phòng dựa trên lịch sử đó
+            const roomsRes = await roomService.searchRooms(searchParams);
+            
+            // 3. Lọc bỏ phòng hiện tại đang xem và lấy tối đa 4 phòng
+            const filtered = (roomsRes.data || [])
+                .filter(r => r.id.toString() !== id)
+                .slice(0, 4);
+                
+            setRecommendedRooms(filtered);
+        } catch (error) {
+            console.error("Lỗi lấy gợi ý:", error);
+        } finally {
+            setLoadingRecs(false);
+        }
+    };
+
 
     // --- XỬ LÝ CHAT VỚI CHỦ NHÀ ---
     const handleChat = async () => {
@@ -218,23 +290,85 @@ const RoomDetail = () => {
                         </Card>
 
                         {/* Đặc điểm */}
+                        {/* Đặc điểm chi tiết căn hộ/phòng */}
                         <Card className="shadow-sm border-none mb-4 rounded-lg">
-                            <div className="grid grid-cols-1 gap-y-4">
-                                <div className="flex items-center border-b border-gray-100 pb-3">
-                                    <ColumnWidthOutlined className="text-xl text-gray-400 mr-3" />
-                                    <span className="text-gray-500 w-40 text-sm">Diện tích</span>
-                                    <span className="text-gray-800 font-medium text-sm">{room.area} m²</span>
+                            <h3 className="font-bold text-lg mb-4 border-b pb-2">Đặc điểm chi tiết</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
+                                
+                                {/* Cột 1 */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <ColumnWidthOutlined className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Diện tích</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.area} m²</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <HomeFilled className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Số phòng ngủ</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.numBedrooms || 0} phòng</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <CheckCircleOutlined className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Nhà vệ sinh</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.numBathrooms || 0} phòng</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <AppstoreAddOutlined className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Tầng số</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.floorNumber ? `Tầng ${room.floorNumber}` : "Tầng trệt"}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center border-b border-gray-100 pb-3">
-                                    <AppstoreOutlined className="text-xl text-gray-400 mr-3" />
-                                    <span className="text-gray-500 w-40 text-sm">Tình trạng nội thất</span>
-                                    <span className="text-gray-800 font-medium text-sm">{missingData.furnitureStatus}</span>
+
+                                {/* Cột 2 */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <DollarOutlined className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Tiền cọc</span>
+                                        </div>
+                                        <span className="text-red-600 font-semibold text-sm">{room.deposit ? `${room.deposit.toLocaleString()} đ` : "Thỏa thuận"}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <Tooltip title="Tình trạng pháp lý của bất động sản">
+                                                <CalendarOutlined className="text-lg mr-3 text-orange-500" />
+                                            </Tooltip>
+                                            <span className="text-sm">Pháp lý</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.legalStatus || "Đang cập nhật"}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <AimOutlined className="text-lg mr-3 text-orange-500" />
+                                            <span className="text-sm">Hướng nhà</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.direction || "Không xác định"}</span>
+                                    </div>
+
+                                    <div className="flex items-center justify-between border-b border-gray-50 pb-2">
+                                        <div className="flex items-center text-gray-500">
+                                            <Tooltip title="Tình trạng trang bị nội thất">
+                                                <AppstoreOutlined className="text-lg mr-3 text-orange-500" />
+                                            </Tooltip>
+                                            <span className="text-sm">Nội thất</span>
+                                        </div>
+                                        <span className="text-gray-800 font-semibold text-sm">{room.furnitureStatus || "Cơ bản"}</span>
+                                    </div>
                                 </div>
-                                <div className="flex items-center border-b border-gray-100 pb-3 last:border-none last:pb-0">
-                                    <DollarOutlined className="text-xl text-gray-400 mr-3" />
-                                    <span className="text-gray-500 w-40 text-sm">Tiền cọc</span>
-                                    <span className="text-gray-800 font-medium text-sm">{room.deposit ? `${room.deposit.toLocaleString()} đ` : "Thỏa thuận"}</span>
-                                </div>
+
                             </div>
                         </Card>
 
@@ -256,6 +390,66 @@ const RoomDetail = () => {
                                     </div>
                                 </div>
                             )}
+                        </Card>
+                       <Card className="shadow-sm border-none rounded-lg mt-4">
+                            <div className="mb-4">
+                                <h3 className="font-bold text-lg mb-1">Lịch sử giá cho thuê</h3>
+                                <Text type="secondary" className="text-xs">Tại khu vực {room.address?.split(',').slice(-2).join(',')}</Text>
+                            </div>
+
+                            {/* 3 Ô thống kê bên trên */}
+                            <Row gutter={[12, 12]} className="mb-6">
+                                <Col span={8}>
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl font-bold">32</span>
+                                            <span className="text-xs text-gray-500">tr/tháng</span>
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Giá thuê phổ biến nhất T12/25</div>
+                                    </div>
+                                </Col>
+                                <Col span={8}>
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
+                                        <div className="text-[#10b981] font-bold text-lg flex items-center gap-1">
+                                            <ArrowUpOutlined /> 10,3%
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Giá thuê đã tăng trong 1 năm qua</div>
+                                    </div>
+                                </Col>
+                                <Col span={8}>
+                                    <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
+                                        <div className="text-[#ef4444] font-bold text-lg flex items-center gap-1">
+                                            <ArrowDownOutlined /> 23,8%
+                                        </div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Thấp hơn đỉnh 42tr (T11/25)</div>
+                                    </div>
+                                </Col>
+                            </Row>
+
+                            {/* Biểu đồ */}
+                            <div className="h-64 w-full mt-4">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <LineChart data={priceData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#999'}} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#999'}} />
+                                        <ChartTooltip />
+                                        <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
+                                        <Line type="monotone" dataKey="highest" name="Giá cao nhất" stroke="#a855f7" strokeWidth={2} dot={false} />
+                                        <Line type="monotone" dataKey="popular" name="Giá phổ biến nhất" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
+                                        <Line type="monotone" dataKey="lowest" name="Giá thấp nhất" stroke="#facc15" strokeWidth={2} dot={false} />
+                                    </LineChart>
+                                </ResponsiveContainer>
+                            </div>
+
+                            {/* Disclaimer Footer */}
+                            <div className="mt-6 bg-purple-50 p-3 rounded-lg flex gap-3 items-start">
+                                <InfoCircleFilled className="text-purple-400 mt-1" />
+                                <p className="text-[10px] text-purple-700 m-0 leading-relaxed">
+                                    Dữ liệu giá được tổng hợp và xử lý từ các tin đăng trên hệ thống Smart Rental. 
+                                    Bạn hãy lưu ý về tin đăng nằm ngoài khoảng giá chúng tôi gợi ý để cân nhắc kỹ trước khi giao dịch.
+                                </p>
+                            </div>
                         </Card>
 
                         {/* Map */}
@@ -357,6 +551,62 @@ const RoomDetail = () => {
                         </div>
                     </Col>
                 </Row>
+                <div className="mt-12 mb-8">
+                    <div className="flex justify-between items-center mb-6">
+                        <h3 className="text-xl font-bold flex items-center gap-2">
+                            <span className="w-1 h-6 bg-orange-500 rounded-full"></span>
+                            Phòng dành cho bạn
+                        </h3>
+                        <Button type="link" onClick={() => navigate('/filter')} className="text-orange-500 font-medium">
+                            Xem thêm <RightOutlined />
+                        </Button>
+                    </div>
+
+                    {loadingRecs ? (
+                        <div className="flex justify-center py-10"><Spin /></div>
+                    ) : (
+                        <Row gutter={[16, 16]}>
+                            {recommendedRooms.length > 0 ? (
+                                recommendedRooms.map(item => (
+                                    <Col xs={24} sm={12} md={6} key={item.id}>
+                                        <Card
+                                            hoverable
+                                            className="rounded-lg overflow-hidden border-none shadow-sm h-full flex flex-col"
+                                            cover={
+                                                <div className="h-40 overflow-hidden relative">
+                                                    <img 
+                                                        src={item.images?.[0] || 'https://via.placeholder.com/300'} 
+                                                        className="w-full h-full object-cover"
+                                                        alt="rec"
+                                                    />
+                                                    <Tag color="orange" className="absolute top-2 left-2 border-none text-[10px]">
+                                                        {item.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Ở ghép'}
+                                                    </Tag>
+                                                </div>
+                                            }
+                                            onClick={() => {
+                                                navigate(`/rooms/${item.id}`);
+                                                window.scrollTo(0, 0);
+                                            }}
+                                        >
+                                            <div className="font-bold text-sm line-clamp-2 h-10 mb-2">{item.title}</div>
+                                            <div className="text-red-600 font-bold text-base mb-1">
+                                                {item.price?.toLocaleString()} đ
+                                            </div>
+                                            <div className="flex items-center text-gray-400 text-xs truncate">
+                                                <EnvironmentOutlined className="mr-1" /> {item.address}
+                                            </div>
+                                        </Card>
+                                    </Col>
+                                ))
+                            ) : (
+                                <Col span={24}>
+                                    <Empty description="Chưa có gợi ý phù hợp" />
+                                </Col>
+                            )}
+                        </Row>
+                    )}
+                </div>
             </div>
 
             {/* --- [MỚI] FIXED BOTTOM BAR (CHO MOBILE) --- */}

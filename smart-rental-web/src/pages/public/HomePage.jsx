@@ -5,7 +5,9 @@ import {
 } from 'antd';
 import {
   SearchOutlined, EnvironmentFilled, HomeFilled, CheckOutlined,
-  AimOutlined, DownOutlined, HeartOutlined, PictureOutlined, RightOutlined
+  AimOutlined, DownOutlined, HeartOutlined, PictureOutlined, RightOutlined,
+  HistoryOutlined,
+  CloseOutlined
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -121,16 +123,18 @@ const HomePage = () => {
 
   const fetchHistory = async () => {
     try {
-      const token = localStorage.getItem('token');
+      // 🟢 SỬA TẠI ĐÂY: Đổi 'token' thành 'accessToken'
+      const token = localStorage.getItem('accessToken');
+
       if (token) {
         const res = await searchHistoryService.getMyHistory();
+        console.log("🔥 Dữ liệu lịch sử tải về:", res.data);
         setHistoryList(res.data);
       }
     } catch (error) {
-      console.log("Không tải được lịch sử (có thể chưa đăng nhập)");
+      console.log("Lỗi tải lịch sử:", error);
     }
   };
-
   const handleDeleteHistory = async (e, id) => {
     e.stopPropagation(); // Ngăn click vào item cha
     try {
@@ -141,14 +145,21 @@ const HomePage = () => {
     }
   };
   const handleSelectHistory = (item) => {
+    // Tạo state từ dữ liệu lịch sử
     const searchParams = {
-      keyword: item.queryText,
-      type: 'ALL', // Hoặc lưu type vào DB nếu muốn
-      locationName: item.queryText, // Dùng tạm queryText làm tên hiển thị
-      locationCoords: { lat: item.latitude, lng: item.longitude },
-      radius: item.radius
+      keyword: item.queryText, // Từ khóa cũ
+      type: 'ALL',
+      locationName: item.queryText, // Hoặc lấy address nếu DB có lưu
+      locationCoords: {
+        lat: item.latitude || 10.7769, // Fallback nếu lịch sử cũ ko có tọa độ
+        lng: item.longitude || 106.7009
+      },
+      radius: item.radius || 20000
     };
+
     setShowHistory(false);
+
+    // 👇 Chuyển hướng ngay lập tức
     navigate('/filter', { state: searchParams });
   };
   // --- API 1: TÌM KIẾM CHÍNH ---
@@ -162,21 +173,22 @@ const HomePage = () => {
         lat: currentParams.locationCoords.lat,
         lng: currentParams.locationCoords.lng,
         radius: currentParams.radius,
-        keyword: currentParams.keyword, 
-        type: currentParams.type      
+        keyword: currentParams.keyword,
+        type: currentParams.type
       });
 
-         if (currentParams.keyword && currentParams.keyword.trim() !== '') {
-          fetchHistory();
+      if (currentParams.keyword && currentParams.keyword.trim() !== '') {
+        fetchHistory();
       }
       let data = res.data || [];
-    
+
       if (currentParams.type !== 'ALL') data = data.filter(r => r.rentalType === currentParams.type);
       setRooms(data);
-    } catch (error) { 
+    } catch (error) {
       console.error(error);
-     } finally { 
-      setLoading(false); }
+    } finally {
+      setLoading(false);
+    }
   };
 
   // --- API 2: TIN MỚI ĐĂNG ---
@@ -256,25 +268,28 @@ const HomePage = () => {
     } catch (e) { message.error({ content: 'Lỗi bản đồ', key: 'geo' }); }
   };
 
-  // =========================================================
-  // 👇👇👇 1. HÀM MỚI: CHUYỂN HƯỚNG SANG TRANG FILTER 👇👇👇
-  // =========================================================
-  // =========================================================
-  // 👇 HÀM XỬ LÝ TÌM KIẾM THÔNG MINH (GEOCODING) 👇
-  // =========================================================
+  // --- XỬ LÝ TÌM KIẾM & CHUYỂN TRANG ---
   const handleSearchNavigate = async () => {
-    // 1. Nếu không có từ khóa, chuyển trang luôn với bộ lọc hiện tại
+    // 1. Chuẩn bị bộ lọc mặc định từ state hiện tại
+    let searchState = {
+      keyword: filters.keyword || '',
+      type: filters.type || 'ALL',
+      locationName: filters.locationName,
+      locationCoords: filters.locationCoords,
+      radius: filters.radius || 20000 // Mặc định 20km
+    };
+
+    // 2. Nếu không có từ khóa -> Chuyển trang ngay với bộ lọc hiện tại
     if (!filters.keyword || !filters.keyword.trim()) {
-      navigate('/filter', { state: filters });
+      navigate('/filter', { state: searchState });
       return;
     }
 
-    // Hiển thị loading nhẹ để người dùng biết hệ thống đang xử lý
-    const hideLoading = message.loading('Đang xác định vị trí...', 0);
+    // 3. Nếu có từ khóa -> Xử lý thông minh (Geocoding)
+    const hideLoading = message.loading('Đang xử lý tìm kiếm...', 0);
 
     try {
-      // 2. Gọi API Nominatim để kiểm tra xem từ khóa có phải là địa điểm không
-      // Giới hạn tìm kiếm trong Việt Nam (countrycodes=vn)
+      // Gọi API OpenStreetMap để xem từ khóa có phải là một địa điểm cụ thể không
       const res = await axios.get('https://nominatim.openstreetmap.org/search', {
         params: {
           q: filters.keyword,
@@ -285,46 +300,37 @@ const HomePage = () => {
         }
       });
 
-      let nextFilters = { ...filters };
-
-      // 3. Phân tích kết quả
       if (res.data && res.data.length > 0) {
+        // ==> TÌM THẤY ĐỊA ĐIỂM (VD: "Quận 1", "Đại học FPT")
         const place = res.data[0];
 
-        // Logic: Nếu tìm thấy địa điểm, ta dời tâm bản đồ về đó
-        // Ví dụ: Nhập "Hà Nội" -> Dời lat/lng về Hà Nội
-        const newCoords = {
+        // Cập nhật tọa độ trung tâm và bán kính nhỏ lại (5km) để tìm xung quanh đó
+        searchState.locationCoords = {
           lat: parseFloat(place.lat),
           lng: parseFloat(place.lon)
         };
+        searchState.locationName = place.name || filters.keyword;
+        searchState.radius = 5000;
 
-        // Cập nhật bộ lọc mới
-        nextFilters.locationCoords = newCoords;
-        nextFilters.locationName = place.name || place.display_name.split(',')[0]; // Lấy tên ngắn gọn
-
-        // Reset bán kính về mức hợp lý (VD: 5km) để kết quả chính xác hơn
-        nextFilters.radius = 5000;
-
-        // Mẹo UX: Có thể giữ keyword để backend lưu lịch sử, 
-        // hoặc xóa keyword để backend tìm tất cả phòng tại vị trí mới (tùy bạn chọn).
-        // Ở đây mình giữ nguyên keyword để lưu lịch sử chính xác.
+        // Tùy chọn: Có thể xóa keyword để API filter chỉ tìm theo tọa độ
+        // searchState.keyword = ''; 
       } else {
-        // 4. Nếu không phải địa điểm (VD: user nhập "Phòng trọ giá rẻ", "Wifi mạnh")
-        // -> Giữ nguyên tọa độ cũ, tìm theo text bình thường.
-        console.log("Không tìm thấy địa điểm, tìm theo từ khóa văn bản.");
+        // ==> KHÔNG PHẢI ĐỊA ĐIỂM (VD: "Phòng trọ giá rẻ", "Có gác")
+        // Giữ nguyên tọa độ hiện tại (hoặc Toàn quốc) và tìm theo text keyword
+        console.log("Tìm theo từ khóa văn bản thuần túy");
       }
 
-      // 5. Chuyển trang với bộ lọc đã được cập nhật (hoặc giữ nguyên)
-      navigate('/filter', { state: nextFilters });
+      // 4. CHUYỂN HƯỚNG SANG TRANG FILTER
+      navigate('/filter', { state: searchState });
 
     } catch (error) {
       console.error("Lỗi định vị:", error);
-      // Nếu lỗi mạng, cứ chuyển trang với dữ liệu cũ
-      navigate('/filter', { state: filters });
+      // Nếu lỗi API map, vẫn chuyển trang bình thường để không chặn người dùng
+      navigate('/filter', { state: searchState });
     } finally {
-      hideLoading(); // Tắt loading
+      hideLoading();
     }
-  };
+  };;
 
   return (
     <ConfigProvider theme={{ token: { colorPrimary: '#f96302', borderRadius: 8 }, components: { Button: { colorPrimary: '#f96302', colorPrimaryHover: '#d85502' } } }}>
@@ -332,9 +338,13 @@ const HomePage = () => {
       <div className="min-h-screen bg-[#f4f4f4] pb-20 font-sans relative" onClick={() => setShowHistory(false)}>
 
         {/* HEADER SEARCH */}
+
         <div className="bg-[#f96302] py-4 sticky top-0 z-50 shadow-md">
           <div className="max-w-6xl mx-auto px-4">
-            <div className="bg-white p-1.5 rounded-lg flex flex-col md:flex-row items-center gap-2 relative" >
+            {/* Thêm class 'relative' để dropdown bám theo div này */}
+            <div className="bg-white p-1.5 rounded-lg flex flex-col md:flex-row items-center gap-2 relative">
+
+              {/* INPUT TÌM KIẾM */}
               <Input
                 prefix={<SearchOutlined className="text-gray-400 text-lg mr-2" />}
                 placeholder="Tìm phòng trọ, căn hộ..."
@@ -342,46 +352,96 @@ const HomePage = () => {
                 className="flex-grow text-base"
                 value={filters.keyword}
                 onChange={e => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+
+                // Khi nhấn Enter -> Tìm kiếm
                 onPressEnter={handleSearchNavigate}
-                onFocus={(e) => { e.stopPropagation(); setShowHistory(true); }} // Mở lịch sử khi focus
+
+                // Khi focus hoặc click vào ô input -> Mở lịch sử
+                onFocus={(e) => { e.stopPropagation(); setShowHistory(true); }}
                 onClick={(e) => { e.stopPropagation(); setShowHistory(true); }}
               />
-              {/* --- DROPDOWN LỊCH SỬ --- */}
+
+       
+              {/* --- PHẦN DROPDOWN LỊCH SỬ (PHIÊN BẢN THU NHỎ) --- */}
               {showHistory && historyList.length > 0 && (
-                <div className="absolute top-full left-0 w-full md:w-[60%] bg-white rounded-md shadow-xl mt-2 z-[100] border border-gray-100 overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                  <div className="bg-gray-50 px-4 py-2 text-xs text-gray-500 font-semibold border-b flex justify-between items-center">
-                    <span>LỊCH SỬ TÌM KIẾM</span>
-                    <span className="cursor-pointer hover:text-red-500" onClick={async () => { await searchHistoryService.clearAll(); setHistoryList([]); }}>Xóa tất cả</span>
+                <div 
+                  // Giảm bo góc xuống rounded-xl và giảm shadow cho nhẹ nhàng
+                  className="absolute top-[105%] left-0 w-full bg-white rounded-xl shadow-xl z-[100] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200" 
+                  onMouseDown={(e) => e.preventDefault()}
+                >
+                  {/* Tiêu đề: Giảm padding và cỡ chữ */}
+                  <div className="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
+                    <span className="text-sm font-semibold text-gray-600">Tiếp tục tìm kiếm</span>
+                    <Button 
+                      type="text" 
+                      size="small" 
+                      className="text-gray-400 hover:text-red-500 text-[11px]"
+                      onClick={async (e) => { 
+                        e.stopPropagation();
+                        await searchHistoryService.clearAllHistory(); 
+                        setHistoryList([]); 
+                      }}
+                    >
+                      Xóa tất cả
+                    </Button>
                   </div>
-                  <div className="max-h-[300px] overflow-y-auto">
+
+                  {/* Danh sách: Giảm chiều cao tối đa xuống 300px */}
+                  <div className="max-h-[300px] overflow-y-auto custom-scrollbar">
                     {historyList.map(item => (
                       <div
                         key={item.id}
-                        className="px-4 py-3 hover:bg-orange-50 cursor-pointer flex justify-between items-center group border-b border-gray-50 last:border-none"
+                        // Giảm padding từ py-4 xuống py-2
+                        className="px-4 py-2 hover:bg-orange-50 cursor-pointer flex justify-between items-center group transition-all border-b border-gray-50 last:border-none"
                         onClick={() => handleSelectHistory(item)}
                       >
-                        <div className="flex items-center gap-3 overflow-hidden">
-                          <HistoryOutlined className="text-gray-400" />
-                          <div className="truncate">
-                            <div className="text-sm font-medium text-gray-700">{item.queryText}</div>
-                            {/* <div className="text-xs text-gray-400">Bán kính: {item.radius < 1000 ? item.radius + 'm' : (item.radius/1000) + 'km'}</div> */}
+                        <div className="flex items-center gap-3 flex-grow overflow-hidden">
+                          {/* Icon: Giảm từ w-10 xuống w-8 */}
+                          <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
+                             <HistoryOutlined className="text-red-400 text-sm" /> 
+                          </div>
+
+                          <div className="flex flex-col truncate">
+                            {/* Chữ chính: text-sm */}
+                            <span className="text-sm text-gray-700 font-medium group-hover:text-[#f96302] truncate">
+                              {item.queryText || item.address || "Tìm kiếm trước đó"}
+                            </span>
+                            
+                            {/* Chữ phụ: nhỏ hơn (text-[11px]) */}
+                            {item.address && item.address !== item.queryText && (
+                               <span className="text-[11px] text-gray-400 truncate opacity-80">
+                                 {item.address}
+                               </span>
+                            )}
                           </div>
                         </div>
-                        <Button
-                          type="text"
-                          icon={<CloseOutlined />}
-                          size="small"
-                          className="text-gray-300 hover:text-red-500 hover:bg-transparent"
-                          onClick={(e) => handleDeleteHistory(e, item.id)}
-                        />
+                        
+                        <div className="flex items-center gap-2">
+                           {/* Mũi tên nhỏ lại */}
+                           <RightOutlined className="text-gray-300 text-[10px] group-hover:text-[#f96302] group-hover:translate-x-0.5 transition-all" />
+                           
+                           <Button
+                             type="text"
+                             icon={<CloseOutlined className="text-[9px]" />}
+                             size="small"
+                             // Thu nhỏ nút xóa
+                             className="text-gray-300 hover:text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               handleDeleteHistory(e, item.id);
+                             }}
+                           />
+                        </div>
                       </div>
                     ))}
                   </div>
                 </div>
               )}
+              {/* --- KẾT THÚC PHẦN LỊCH SỬ --- */}
 
               <div className="hidden md:block w-[1px] h-6 bg-gray-200"></div>
 
+              {/* Các nút Lọc Khu Vực, Loại Phòng giữ nguyên */}
               <Popover content={<LocationSelectContent onClose={() => setOpenLocation(false)} onApply={handleApplyLocation} />} trigger="click" open={openLocation} onOpenChange={setOpenLocation} placement="bottom" arrow={false}>
                 <Button className="border-none shadow-none text-gray-700 font-medium hover:bg-gray-50 flex items-center">
                   <EnvironmentFilled className="text-[#f96302]" /> <span className="truncate max-w-[120px]">{filters.locationName}</span> <DownOutlined className="text-xs text-gray-400" />
@@ -394,8 +454,13 @@ const HomePage = () => {
                 </Button>
               </Popover>
 
-              {/* 👇 3. Cập nhật nút Tìm Ngay */}
-              <Button type="primary" className="px-6 font-bold h-9" onClick={handleSearchNavigate}>Tìm ngay</Button>
+              <Button
+                type="primary"
+                className="px-6 font-bold h-9"
+                onClick={handleSearchNavigate}
+              >
+                Tìm ngay
+              </Button>
             </div>
           </div>
         </div>

@@ -9,7 +9,7 @@ import {
   EnvironmentOutlined, HeartOutlined, UserOutlined, FilterOutlined,
   AppstoreOutlined, UnorderedListOutlined, EnvironmentFilled, HomeFilled,
   DownOutlined, CameraFilled, CheckOutlined,
-  RightOutlined, SearchOutlined, AimOutlined // <--- 1. ĐÃ THÊM IMPORT AimOutlined
+  RightOutlined, SearchOutlined,AimOutlined 
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -338,7 +338,9 @@ const FilterPage = () => {
       const res = await roomService.searchRooms({
         lat: filters.locationCoords.lat,
         lng: filters.locationCoords.lng,
-        radius: filters.radius || 20000
+        radius: filters.radius || 20000,
+        keyword: filters.keyword, // Gửi từ khóa xuống để Backend lưu lịch sử
+        type: filters.type        // Gửi loại phòng (Nguyên căn/Ở ghép) để lọc
       });
 
       let data = res.data || [];
@@ -746,8 +748,8 @@ const FilterPage = () => {
                     </div>
                   ) : (
                     topLandlords.map((landlord) => (
-                      <div 
-                        key={landlord.id} 
+                      <div
+                        key={landlord.id}
                         className="flex items-center justify-between group cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
                         // --- SỬA LẠI: Đặt onClick vào trong thẻ div ---
                         onClick={() => navigate(`/users/public-profile/${landlord.id}`)}

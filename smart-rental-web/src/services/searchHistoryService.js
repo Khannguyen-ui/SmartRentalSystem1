@@ -1,26 +1,19 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:8080/api/search-history'; // Thay đổi port nếu cần
-
-const getAuthHeader = () => {
-    const token = localStorage.getItem('token');
-    return token ? { Authorization: `Bearer ${token}` } : {};
-};
+import axiosClient from "../config/axiosClient"; 
 
 const searchHistoryService = {
-    // Lấy danh sách lịch sử
+    // 1. Lấy danh sách lịch sử
     getMyHistory: () => {
-        return axios.get(API_URL, { headers: getAuthHeader() });
+        return axiosClient.get('/search-history'); 
     },
 
-    // Xóa 1 dòng lịch sử
+    // 2. Xóa 1 dòng lịch sử
     deleteHistory: (id) => {
-        return axios.delete(`${API_URL}/${id}`, { headers: getAuthHeader() });
+        return axiosClient.delete(`/search-history/${id}`);
     },
 
-    // Xóa tất cả
-    clearAll: () => {
-        return axios.delete(`${API_URL}/all`, { headers: getAuthHeader() });
+    // 3. Xóa tất cả
+    clearAllHistory: () => {
+        return axiosClient.delete('/search-history/all');
     }
 };
 
