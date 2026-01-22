@@ -1,327 +1,313 @@
 import React, { useEffect, useState } from 'react';
 import { 
-  Card, Avatar, Form, Input, Button, message, Upload, 
-  Tabs, Row, Col, Statistic, InputNumber, Table, Tag, Typography, Modal, Alert 
+  Form, Input, Button, message, Upload, Tabs, Avatar, Collapse, Typography, Modal 
 } from 'antd';
 import { 
-  UserOutlined, UploadOutlined, SaveOutlined, 
-  WalletOutlined, HistoryOutlined, CreditCardOutlined, 
-  SafetyCertificateOutlined, ArrowUpOutlined, IdcardOutlined,
-  HomeOutlined // Import HomeOutlined
+  UserOutlined, CameraOutlined, PlusOutlined, 
+  LockOutlined, RightOutlined
 } from '@ant-design/icons';
-import dayjs from 'dayjs';
-import paymentService from '../../services/paymentService'; 
 import userService from '../../services/userService'; 
+import uploadService from '../../services/uploadService';
 import useAuth from '../../hooks/useAuth'; 
 import { useNavigate } from 'react-router-dom';
 
-const { Text, Title } = Typography;
+const { Title, Text } = Typography;
+const { Panel } = Collapse;
 
 const UserProfile = () => {
-  const { user, logout, refreshProfile } = useAuth(); // refreshProfile để load lại user sau khi nâng cấp
+  const { user, refreshProfile } = useAuth(); 
   const [form] = Form.useForm();
-  const navigate = useNavigate();
+  const [passwordForm] = Form.useForm();
   
-  // State chung
   const [loading, setLoading] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState('');
-
-  // State cho Ví & Giao dịch
-  const [balance, setBalance] = useState(0);
-  const [transactions, setTransactions] = useState([]);
-  const [depositAmount, setDepositAmount] = useState(50000);
-  const [loadingPay, setLoadingPay] = useState(false);
-
-  // State cho Nâng cấp
-  const [loadingUpgrade, setLoadingUpgrade] = useState(false);
-
+  
   // Load dữ liệu khi vào trang
   useEffect(() => {
     if (user) {
-        fetchAllData();
+        setAvatarUrl(user.avatarUrl);
+        form.setFieldsValue({
+            fullName: user.fullName,
+            email: user.email,
+            phone: user.phone,
+            citizenId: user.citizenId // Tạm dùng trường này cho "Mã số thuế" nếu chưa có field riêng
+        });
     }
   }, [user]);
 
-  const fetchAllData = async () => {
+  // --- XỬ LÝ UPLOAD ẢNH ---
+  const handleUploadAvatar = async ({ file, onSuccess, onError }) => {
     try {
-      const [profileRes, historyRes] = await Promise.all([
-        paymentService.getMyWallet(), // Hoặc userService.getProfile()
-        paymentService.getMyHistory()
-      ]);
-
-      const userData = profileRes.data;
+      const result = await uploadService.uploadImage(file);
+      const newUrl = result?.url || result; 
       
-      // 1. Fill thông tin cá nhân
-      setAvatarUrl(userData.avatarUrl);
-      setBalance(userData.walletBalance); 
-      form.setFieldsValue({
-        fullName: userData.fullName,
-        email: userData.email,
-        phone: userData.phone,
-        citizenId: userData.citizenId
-      });
-
-      // 2. Fill lịch sử giao dịch
-      setTransactions(historyRes.data);
-
+      // Cập nhật State & DB ngay lập tức
+      const urlWithTime = `${newUrl}?t=${Date.now()}`;
+      setAvatarUrl(urlWithTime); 
+      await userService.updateProfile({ avatarUrl: newUrl });
+      
+      refreshProfile(); 
+      message.success("Cập nhật ảnh đại diện thành công!");
+      onSuccess("Ok");
     } catch (error) {
-      console.error(error);
+      message.error("Lỗi upload ảnh.");
+      onError(error);
     }
   };
 
+  // --- XỬ LÝ CẬP NHẬT THÔNG TIN ---
   const handleUpdateInfo = async (values) => {
     setLoading(true);
     try {
-      await userService.updateProfile(values); // API update
-      message.success("Cập nhật thông tin thành công!");
-      refreshProfile(); // Load lại Context
+      await userService.updateProfile({ 
+          ...values, 
+          avatarUrl: avatarUrl.split('?')[0] // Bỏ timestamp khi lưu
+      });
+      message.success("Lưu thay đổi thành công!");
+      refreshProfile(); 
     } catch (error) {
-      message.error("Cập nhật thất bại");
+      message.error("Cập nhật thất bại: " + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleUpgrade = () => {
-    // --- BỔ SUNG: CHẶN NẾU CHƯA KYC ---
-    if (user?.kycStatus !== 'VERIFIED') {
-        Modal.warning({
-            title: 'Chưa xác minh danh tính',
-            content: 'Vui lòng hoàn tất xác minh danh tính (tab Bảo mật & Định danh) trước khi nâng cấp tài khoản.',
-            okText: 'Đã hiểu'
-        });
-        return; // Dừng lại ngay
+  // --- XỬ LÝ ĐỔI MẬT KHẨU ---
+  const handleChangePassword = async (values) => {
+    // Vì chưa có API đổi mật khẩu trong code bạn gửi, 
+    // đây là khung sườn để bạn gọi API sau này.
+    if (values.newPassword !== values.confirmPassword) {
+        return message.error("Mật khẩu nhập lại không khớp!");
     }
-    // ----------------------------------
-
-    Modal.confirm({
-        title: 'Xác nhận nâng cấp tài khoản',
-        icon: <ArrowUpOutlined style={{ color: '#1890ff' }} />,
-        content: (
-            <div>
-                <p>Bạn có chắc muốn trở thành <b>Chủ trọ</b>?</p>
-                <p className="text-gray-500 text-xs">Bạn sẽ cần đăng nhập lại để hệ thống cập nhật quyền hạn.</p>
-            </div>
-        ),
-        okText: 'Đồng ý',
-        cancelText: 'Hủy',
-        onOk: async () => {
-            setLoadingUpgrade(true);
-            try {
-                await userService.upgradeToLandlord();
-                message.success("Nâng cấp thành công! Đang chuyển về trang đăng nhập...");
-                
-                await logout(); // Logout để xóa Token cũ
-                setTimeout(() => navigate('/login'), 1500);
-            } catch (error) {
-                message.error(error.response?.data?.message || "Có lỗi xảy ra");
-            } finally {
-                setLoadingUpgrade(false);
-            }
-        }
-    });
+    
+    message.loading("Đang xử lý...");
+    setTimeout(() => {
+        message.success("Đổi mật khẩu thành công (Mô phỏng)");
+        passwordForm.resetFields();
+    }, 1000);
+    
+    /* try {
+        await userService.changePassword(values.currentPassword, values.newPassword);
+        message.success("Đổi mật khẩu thành công!");
+        passwordForm.resetFields();
+    } catch (error) {
+        message.error("Đổi mật khẩu thất bại");
+    }
+    */
   };
 
-  // --- TAB 3: LOGIC HIỂN THỊ KYC ---
-  const renderKycStatus = () => {
-      const status = user?.kycStatus || 'UNVERIFIED';
-      
-      let color = 'default';
-      let text = 'Chưa xác minh';
-      let desc = 'Vui lòng xác minh danh tính để đảm bảo an toàn và sử dụng các tính năng nâng cao.';
+  // --- COMPONENT CON: TAB 1 - CHỈNH SỬA THÔNG TIN ---
+  const EditInfoTab = () => (
+    <Form 
+        form={form} 
+        layout="vertical" 
+        onFinish={handleUpdateInfo}
+        className="max-w-3xl"
+    >
+      {/* 1. Thông tin cá nhân */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-6 border-b pb-2">Thông tin cá nhân</h3>
+        
+        {/* Avatar Upload Center */}
+        <div className="flex justify-center mb-8">
+            <Upload 
+                showUploadList={false}
+                customRequest={handleUploadAvatar}
+            >
+                <div className="relative group cursor-pointer">
+                    <Avatar 
+                        size={120} 
+                        src={avatarUrl} 
+                        icon={<UserOutlined />} 
+                        className="border-4 border-white shadow-lg"
+                    />
+                    <div className="absolute inset-0 bg-black/40 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="text-white text-center">
+                            <CameraOutlined className="text-2xl block" />
+                            <span className="text-xs">Tải ảnh</span>
+                        </div>
+                    </div>
+                </div>
+            </Upload>
+        </div>
 
-      if (status === 'VERIFIED') {
-          color = 'success';
-          text = 'Đã xác minh';
-          desc = 'Tài khoản của bạn đã được xác minh chính chủ.';
-      } else if (status === 'PENDING') {
-          color = 'warning';
-          text = 'Đang chờ duyệt';
-          desc = 'Hồ sơ của bạn đang được Admin kiểm tra. Vui lòng chờ.';
-      } else if (status === 'REJECTED') {
-          color = 'error';
-          text = 'Bị từ chối';
-          desc = 'Hồ sơ không hợp lệ. Vui lòng kiểm tra lại ảnh và gửi lại.';
-      }
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Form.Item label="Họ và tên" name="fullName" rules={[{ required: true }]}>
+                <Input size="large" className="rounded-md" />
+            </Form.Item>
+            <Form.Item label="Mã số thuế cá nhân (CCCD)" name="citizenId">
+                <Input size="large" className="rounded-md" placeholder="Nhập mã số thuế hoặc CCCD" />
+            </Form.Item>
+        </div>
+      </div>
 
-      return (
-          <div className="bg-gray-50 p-6 rounded-lg border border-gray-200">
-              <div className="flex items-center justify-between mb-4">
-                  <span className="font-bold text-lg text-gray-700">Trạng thái định danh</span>
-                  <Tag color={color} style={{ fontSize: '14px', padding: '4px 10px' }}>
-                      {text.toUpperCase()}
-                  </Tag>
+      {/* 2. Thông tin liên hệ */}
+      <div className="mb-8">
+        <h3 className="text-lg font-semibold text-gray-800 mb-6 border-b pb-2">Thông tin liên hệ</h3>
+        
+        <Form.Item label="Số điện thoại chính" name="phone" rules={[{ required: true }]}>
+            <Input size="large" className="bg-gray-50" readOnly /> 
+            {/* Thường SĐT dùng để đăng nhập nên hạn chế sửa trực tiếp, hoặc cho sửa nếu API cho phép */}
+        </Form.Item>
+
+        <Button type="link" icon={<PlusOutlined />} className="text-red-500 hover:text-red-600 p-0 mb-4 font-medium">
+            Thêm số điện thoại (1/5)
+        </Button>
+
+        <Form.Item label="Email" name="email">
+            <Input size="large" disabled className="bg-gray-100 text-gray-500" />
+        </Form.Item>
+      </div>
+
+      {/* Nút Submit */}
+      <div className="flex justify-end mt-4">
+        <Button 
+            type="primary" 
+            htmlType="submit" 
+            size="large"
+            loading={loading}
+            className="bg-[#d32f2f] hover:bg-[#b71c1c] border-none font-medium px-8 h-10 rounded shadow-sm"
+        >
+            Lưu thay đổi
+        </Button>
+      </div>
+    </Form>
+  );
+
+  // --- COMPONENT CON: TAB 2 - CÀI ĐẶT TÀI KHOẢN ---
+  const AccountSettingsTab = () => (
+    <div className="max-w-3xl">
+       {/* 1. Đổi mật khẩu */}
+       <div className="mb-10">
+          <h3 className="text-lg font-semibold text-gray-800 mb-6">Đổi mật khẩu</h3>
+          <Form form={passwordForm} layout="vertical" onFinish={handleChangePassword}>
+             <Form.Item 
+                label="Mật khẩu hiện tại" 
+                name="currentPassword" 
+                rules={[{ required: true, message: 'Nhập mật khẩu hiện tại' }]}
+             >
+                <Input.Password size="large" placeholder="********" />
+             </Form.Item>
+             
+             <div className="flex justify-end -mt-6 mb-4">
+                <a href="#" className="text-red-500 text-sm hover:underline">Bạn quên mật khẩu?</a>
+             </div>
+
+             <Form.Item 
+                label="Mật khẩu mới" 
+                name="newPassword"
+                rules={[
+                    { required: true, message: 'Nhập mật khẩu mới' },
+                    { min: 6, message: 'Tối thiểu 6 ký tự' }
+                ]}
+             >
+                <Input.Password size="large" />
+             </Form.Item>
+
+             <div className="flex items-end gap-4">
+                 <div className="flex-1">
+                    <Form.Item 
+                        label="Nhập lại mật khẩu mới" 
+                        name="confirmPassword"
+                        dependencies={['newPassword']}
+                        rules={[
+                            { required: true, message: 'Xác nhận mật khẩu' },
+                            ({ getFieldValue }) => ({
+                                validator(_, value) {
+                                if (!value || getFieldValue('newPassword') === value) {
+                                    return Promise.resolve();
+                                }
+                                return Promise.reject(new Error('Mật khẩu không khớp!'));
+                                },
+                            }),
+                        ]}
+                    >
+                        <Input.Password size="large" />
+                    </Form.Item>
+                 </div>
+                 <div className="mb-6">
+                    <Button 
+                        type="primary" 
+                        htmlType="submit"
+                        className="bg-[#d32f2f] hover:bg-[#b71c1c] border-none h-10 px-6 font-medium"
+                    >
+                        Lưu thay đổi
+                    </Button>
+                 </div>
+             </div>
+
+             <ul className="text-gray-400 text-sm list-disc pl-5 mt-2 space-y-1">
+                <li>Mật khẩu tối thiểu 6 ký tự</li>
+                <li>Chứa ít nhất 1 ký tự viết hoa</li>
+                <li>Chứa ít nhất 1 ký tự số</li>
+             </ul>
+          </Form>
+       </div>
+
+       {/* 2. Các mục mở rộng (Collapse) */}
+       <div className="border-t pt-4">
+          <Collapse 
+            ghost 
+            expandIconPosition="end" 
+            expandIcon={({ isActive }) => <RightOutlined rotate={isActive ? 90 : 0} />}
+            className="site-collapse-custom-collapse"
+          >
+            <Panel header={<span className="font-semibold text-gray-800 text-base">Yêu cầu khóa tài khoản</span>} key="1">
+              <div className="pl-4 pb-2">
+                 <p className="text-gray-600 mb-2">Tạm thời vô hiệu hóa tài khoản của bạn. Các tin đăng sẽ bị ẩn.</p>
+                 <Button danger>Khóa tài khoản</Button>
               </div>
-              <p className="text-gray-600 mb-6">{desc}</p>
+            </Panel>
+            <Panel header={<span className="font-semibold text-gray-800 text-base">Yêu cầu xóa tài khoản</span>} key="2">
+              <div className="pl-4 pb-2">
+                 <p className="text-gray-600 mb-2 text-sm">Hành động này không thể hoàn tác. Mọi dữ liệu sẽ bị xóa vĩnh viễn.</p>
+                 <Button type="primary" danger>Xóa vĩnh viễn</Button>
+              </div>
+            </Panel>
+          </Collapse>
+       </div>
+    </div>
+  );
 
-              {/* Nút gửi yêu cầu (Chỉ hiện khi chưa verified hoặc bị từ chối) */}
-              {(status === 'UNVERIFIED' || status === 'REJECTED') && (
-                  <Button 
-                    type="primary" 
-                    icon={<IdcardOutlined />} 
-                    onClick={() => navigate('/kyc')} // Chuyển sang trang KycVerification.jsx đã làm ở câu trước
-                  >
-                      Gửi hồ sơ xác minh ngay
-                  </Button>
-              )}
-          </div>
-      );
-  };
-
-  const tabItems = [
+  // --- CẤU HÌNH TABS ---
+  const items = [
     {
       key: '1',
-      label: <span><UserOutlined /> Thông tin chung</span>,
-      children: (
-        <Form form={form} layout="vertical" onFinish={handleUpdateInfo} className="mt-4">
-          <div className="flex flex-col items-center mb-6">
-            <Avatar 
-              size={100} 
-              src={avatarUrl || null} 
-              icon={<UserOutlined />} 
-              className="mb-4 bg-gray-200" 
-            />
-            <Upload showUploadList={false}>
-              <Button icon={<UploadOutlined />}>Đổi ảnh đại diện</Button>
-            </Upload>
-          </div>
-
-          <Row gutter={16}>
-            <Col span={12}>
-              <Form.Item label="Email" name="email">
-                <Input disabled className="bg-gray-50 text-gray-500" />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="Họ tên" name="fullName" rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="SĐT" name="phone" rules={[{ required: true }]}>
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col span={12}>
-              <Form.Item label="CCCD (Tự động điền khi KYC)" name="citizenId">
-                <Input disabled /> 
-              </Form.Item>
-            </Col>
-          </Row>
-
-          <Button type="primary" htmlType="submit" icon={<SaveOutlined />} loading={loading} className="mt-2">
-            Lưu thay đổi
-          </Button>
-
-          {/* --- PHẦN NÂNG CẤP CHỦ TRỌ --- */}
-          {user?.role === 'TENANT' && (
-             <div className="mt-8 pt-6 border-t border-dashed border-gray-300">
-                <Alert
-                    message="Bạn có phòng trống muốn cho thuê?"
-                    description={
-                        <div className="mt-2">
-                            <p className="mb-2 text-sm text-gray-600">Nâng cấp tài khoản lên <b>Chủ trọ</b> để đăng tin và quản lý phòng trọ ngay hôm nay.</p>
-                            <Button 
-                                type="primary" 
-                                ghost 
-                                icon={<ArrowUpOutlined />} 
-                                onClick={handleUpgrade}
-                                loading={loadingUpgrade}
-                                disabled={user.kycStatus !== 'VERIFIED'} // Bắt buộc KYC mới cho nâng cấp
-                            >
-                                Kích hoạt Chế độ Chủ trọ
-                            </Button>
-                            {user.kycStatus !== 'VERIFIED' && (
-                                <div className="text-red-500 text-xs mt-1">* Bạn cần xác minh danh tính trước khi nâng cấp.</div>
-                            )}
-                        </div>
-                    }
-                    type="info"
-                    showIcon
-                    icon={<HomeOutlined />}
-                />
-             </div>
-          )}
-        </Form>
-      ),
+      label: 'Chỉnh sửa thông tin',
+      children: <EditInfoTab />,
     },
     {
       key: '2',
-      label: <span><SafetyCertificateOutlined /> Bảo mật & Định danh</span>,
-      children: renderKycStatus(),
+      label: 'Cài đặt tài khoản',
+      children: <AccountSettingsTab />,
     },
     {
       key: '3',
-      label: <span><WalletOutlined /> Ví & Giao dịch</span>,
-      children: (
-        <div className="mt-4">
-          <div className="bg-blue-50 p-6 rounded-lg mb-6 border border-blue-100">
-            <Row gutter={24} align="middle">
-              <Col span={10} className="border-r border-gray-300">
-                <Statistic
-                  title="Số dư khả dụng"
-                  value={balance}
-                  precision={0}
-                  valueStyle={{ color: '#3f8600', fontWeight: 'bold', fontSize: '2rem' }}
-                  prefix={<WalletOutlined />}
-                  suffix="VNĐ"
-                />
-              </Col>
-              <Col span={14}>
-                <Text strong className="block mb-2">Nạp tiền (VNPay):</Text>
-                <div className="flex gap-3">
-                  <InputNumber
-                    className="w-full max-w-xs"
-                    addonAfter="VNĐ"
-                    defaultValue={50000}
-                    step={10000}
-                    min={10000}
-                    formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
-                    parser={value => value.replace(/\$\s?|(,*)/g, '')}
-                    onChange={setDepositAmount}
-                  />
-                  <Button 
-                    type="primary" 
-                    icon={<CreditCardOutlined />} 
-                    loading={loadingPay}
-                    onClick={() => {/* Hàm nạp tiền cũ */}} // Bạn tự điền lại hàm handleDeposit
-                    className="bg-blue-600 hover:bg-blue-500"
-                  >
-                    Thanh toán ngay
-                  </Button>
-                </div>
-              </Col>
-            </Row>
-          </div>
-
-          <h3 className="font-bold text-lg mb-3 flex items-center">
-            <HistoryOutlined className="mr-2" /> Lịch sử giao dịch
-          </h3>
-          <Table 
-            columns={[
-                /* Copy lại columns từ code cũ */
-                { title: 'Thời gian', dataIndex: 'createdAt', render: (date) => dayjs(date).format('DD/MM/YYYY HH:mm') },
-                { title: 'Loại', dataIndex: 'type', render: (type) => <Tag color={type === 'DEPOSIT' ? 'green' : 'volcano'}>{type}</Tag> },
-                { title: 'Số tiền', dataIndex: 'amount', render: (amount) => <span>{amount.toLocaleString()} đ</span> },
-                { title: 'Trạng thái', dataIndex: 'status', render: (status) => <Tag>{status}</Tag> }
-            ]} 
-            dataSource={transactions} 
-            rowKey="id"
-            pagination={{ pageSize: 5 }}
-            bordered
-            size="small"
-          />
-        </div>
+      label: (
+        <span className="flex items-center gap-1">
+            Đăng ký Môi giới chuyên nghiệp <span className="bg-red-500 text-white text-[10px] px-1 rounded ml-1">Mới</span>
+        </span>
       ),
+      disabled: true, // Tạm thời disable như ảnh mẫu
     },
   ];
 
   return (
-    <div className="max-w-4xl mx-auto p-6">
-      <Card className="shadow-md" bordered={false}>
-        <h2 className="text-2xl font-bold mb-6 text-center text-blue-900">Hồ Sơ Cá Nhân</h2>
-        <Tabs defaultActiveKey="1" items={tabItems} size="large" centered />
-      </Card>
+    <div className="bg-white min-h-screen p-6 md:p-10">
+      <div className="max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-gray-800 mb-6">Quản lý tài khoản</h1>
+        
+        <Tabs 
+            defaultActiveKey="1" 
+            items={items} 
+            size="large"
+            tabBarStyle={{ 
+                borderBottom: '1px solid #f0f0f0', 
+                marginBottom: '32px',
+                fontWeight: 500
+            }}
+        />
+      </div>
     </div>
   );
 };

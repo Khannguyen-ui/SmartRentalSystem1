@@ -18,12 +18,14 @@ import RoomApprove from '../pages/admin/RoomApprove';
 import MasterData from '../pages/admin/MasterData';
 import UserManagement from '../pages/admin/UserManagement';
 
-// Landlord (Và dùng chung cho Tenant ở một số trang)
+// Landlord
 import CreateRoom from '../pages/landlord/CreateRoom';
 import MyRooms from '../pages/landlord/MyRooms';
 import AppointmentManagement from '../pages/landlord/AppointmentManagement';
-import RoomDetail from '../pages/landlord/RoomDetail';
+import RoomDetail from '../pages/common/RoomDetail';
 import LandlordFinance from '../pages/landlord/LandlordFinance';
+import CustomerManagement from '../pages/landlord/CustomerManagement';
+import LandlordDashboard from '../pages/landlord/LandlordDashboard';
 
 // Common
 import UserProfile from '../pages/common/UserProfile';
@@ -32,7 +34,11 @@ import HomePage from '../pages/public/HomePage';
 import SearchMap from '../pages/common/SearchMap';
 import FilterPage from '../pages/common/FilterPage';
 import KycVerification from '../pages/common/KycVerification';
-import NotificationPage from '../pages/common/NotificationPage'; // <--- IMPORT MỚI
+import NotificationPage from '../pages/common/NotificationPage';
+import LandlordProfile from '../pages/common/LandlordProfile';
+
+// --- [MỚI] IMPORT TRANG CHAT ---
+import ChatPage from '../pages/common/ChatPage'; 
 
 const AppRoutes = () => {
     return (
@@ -49,9 +55,9 @@ const AppRoutes = () => {
                 {/* Trang tìm kiếm, chi tiết phòng (Public xem được) */}
                 <Route path="/search" element={<SearchMap />} />
                 <Route path="/filter" element={<FilterPage />} />
+                <Route path="/users/public-profile/:id" element={<LandlordProfile />} />
                 <Route path="/rooms/:id" element={<RoomDetail />} />
                 
-                {/* Route Admin Login */}
                 <Route path="/admin/login" element={<AdminLogin />} />
             </Route>
 
@@ -67,8 +73,11 @@ const AppRoutes = () => {
                     {/* Xác thực danh tính */}
                     <Route path="/kyc" element={<KycVerification />} />
 
-                    {/* --- [MỚI] Trang Thông báo dùng chung --- */}
+                    {/* Trang Thông báo */}
                     <Route path="/notifications" element={<NotificationPage />} />
+
+                    {/* --- [MỚI] TRANG TIN NHẮN (Dùng chung cho Tenant & Landlord) --- */}
+                    <Route path="/messages" element={<ChatPage />} />
                 </Route>
             </Route>
 
@@ -77,8 +86,7 @@ const AppRoutes = () => {
             {/* ========================================================= */}
             <Route element={<ProtectedRoute allowedRoles={['TENANT']} />}>
                 <Route path="/tenant" element={<MainLayout />}>
-                    {/* --- [MỚI] Tái sử dụng Component quản lý lịch hẹn --- */}
-                    {/* Component này đã được sửa để tự nhận diện là Tenant (Tab 'Tôi đi hẹn') */}
+                    {/* Quản lý lịch hẹn */}
                     <Route path="appointments" element={<AppointmentManagement />} />
                 </Route>
             </Route>
@@ -90,10 +98,11 @@ const AppRoutes = () => {
                 <Route path="/landlord" element={<MainLayout />}>
                     <Route index element={<Navigate to="room-list" />} />
                     
-                    <Route path="dashboard" element={<div>Thống kê chủ trọ</div>} />
+                    <Route path="dashboard" element={<LandlordDashboard/>} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="room-list" element={<MyRooms />} />
                     <Route path="appointments" element={<AppointmentManagement />} />
+                    <Route path="customers" element={<CustomerManagement />} />
                     <Route path="finance" element={<LandlordFinance />} />
                 </Route>
             </Route>

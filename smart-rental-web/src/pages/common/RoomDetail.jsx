@@ -22,6 +22,7 @@ import L from 'leaflet';
 // Import Services & Hooks
 import roomService from '../../services/roomService';
 import useAuth from '../../hooks/useAuth';
+import chatService from '../../services/chatService';
 
 // --- 2. FIX LỖI ICON CỦA LEAFLET TRONG REACT ---
 import icon from 'leaflet/dist/images/marker-icon.png';
@@ -52,7 +53,7 @@ const RoomDetail = () => {
     const [room, setRoom] = useState(null);
     const [loading, setLoading] = useState(false);
     const [showPhone, setShowPhone] = useState(false);
-    
+
     // --- STATE CHO BOOKING ---
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [bookingLoading, setBookingLoading] = useState(false);
@@ -73,12 +74,35 @@ const RoomDetail = () => {
         if (id) fetchData();
     }, [id]);
 
-    const handleChat = () => {
+    // --- XỬ LÝ CHAT VỚI CHỦ NHÀ ---
+    const handleChat = async () => {
         if (!user) {
             message.warning("Vui lòng đăng nhập để chat!");
-            return navigate('/login');
+            navigate('/login');
+            return;
         }
-        message.info("Chức năng chat đang được nâng cấp.");
+
+        // Không cho phép tự chat với chính mình
+        if (user.id === room.landlordId) {
+            message.info("Đây là bài đăng của bạn.");
+            return;
+        }
+
+        try {
+            message.loading({ content: "Đang kết nối...", key: 'chat_loading' });
+
+            // 1. Gọi API tạo hội thoại (hoặc lấy hội thoại cũ nếu có)
+            await chatService.startConversation(room.landlordId);
+
+            message.success({ content: "Đã kết nối!", key: 'chat_loading' });
+
+            // 2. Chuyển hướng sang trang tin nhắn
+            navigate('/messages');
+
+        } catch (error) {
+            console.error(error);
+            message.error({ content: "Lỗi kết nối server chat.", key: 'chat_loading' });
+        }
     };
 
     const handleZalo = () => {
@@ -124,8 +148,8 @@ const RoomDetail = () => {
     };
 
     return (
-        <div className="bg-gray-100 min-h-screen pb-24 md:pb-10 font-sans text-gray-800 relative"> 
-        {/* Thêm pb-24 để tránh nội dung bị che bởi Bottom Bar trên mobile */}
+        <div className="bg-gray-100 min-h-screen pb-24 md:pb-10 font-sans text-gray-800 relative">
+            {/* Thêm pb-24 để tránh nội dung bị che bởi Bottom Bar trên mobile */}
 
             {/* Breadcrumb */}
             <div className="max-w-6xl mx-auto px-4 py-3 text-sm">
@@ -273,7 +297,7 @@ const RoomDetail = () => {
                     {/* ================= CỘT PHẢI (CHỈNH SỬA UX) ================= */}
                     <Col xs={24} lg={8}>
                         <div className="sticky top-4 space-y-4">
-                            
+
                             {/* --- [MỚI] CARD ĐẶT LỊCH XEM PHÒNG (CHO DESKTOP) --- */}
                             {/* Ẩn trên mobile vì mobile đã có Bottom Bar */}
                             <Card className="hidden lg:block shadow-md border-t-4 border-t-orange-500 rounded-lg">
@@ -281,10 +305,10 @@ const RoomDetail = () => {
                                     <div className="text-gray-500 text-xs">Giá thuê phòng</div>
                                     <div className="text-red-600 font-bold text-2xl">{room.price?.toLocaleString()} đ/tháng</div>
                                 </div>
-                                <Button 
-                                    type="primary" 
-                                    size="large" 
-                                    block 
+                                <Button
+                                    type="primary"
+                                    size="large"
+                                    block
                                     className="bg-orange-600 hover:bg-orange-500 font-bold h-12 mb-3"
                                     icon={<CalendarOutlined />}
                                     onClick={() => setIsModalOpen(true)}
@@ -341,8 +365,8 @@ const RoomDetail = () => {
                     <div className="text-xs text-gray-500">Giá thuê</div>
                     <div className="text-red-600 font-bold text-lg">{room.price?.toLocaleString()} đ</div>
                 </div>
-                <Button 
-                    type="primary" 
+                <Button
+                    type="primary"
                     className="bg-orange-600 border-none font-bold px-6 h-10 shadow-md"
                     onClick={() => setIsModalOpen(true)}
                 >

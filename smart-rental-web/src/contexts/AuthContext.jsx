@@ -1,7 +1,6 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { message } from 'antd';
 import axiosClient from '../config/axiosClient';
-// 1. IMPORT SERVICE ĐỂ GỌI API PROFILE
 import userService from '../services/userService';
 
 export const AuthContext = createContext(null);
@@ -10,29 +9,43 @@ export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // 2. THÊM HÀM LẤY LẠI THÔNG TIN USER TỪ SERVER
+  // --- HÀM LOGOUT (Đưa lên trên để refreshProfile gọi được) ---
+  const logout = () => {
+    localStorage.clear(); // Xóa sạch token cũ
+    setUser(null);
+    // Tùy chọn: Chuyển hướng về trang login nếu cần
+    // window.location.href = '/login'; 
+  };
+
+  // --- 1. SỬA HÀM refreshProfile ---
   const refreshProfile = async () => {
+    const token = localStorage.getItem('accessToken');
+    
+    // Nếu không có token thì thôi, không gọi API làm gì
+    if (!token) {
+        setLoading(false);
+        return;
+    }
+
     try {
-      const token = localStorage.getItem('accessToken');
-      if (token) {
-        // Gọi API /users/profile để lấy dữ liệu mới nhất (KYC, Ví, ...)
-        const res = await userService.getProfile();
-        setUser(res.data); 
-      }
+      // Gọi API lấy thông tin mới nhất
+      const res = await userService.getProfile();
+      setUser(res.data);
     } catch (error) {
-      console.error("Không thể tải thông tin user mới nhất:", error);
+      console.error("Lỗi tải thông tin user:", error);
+
+      // QUAN TRỌNG: Nếu Token hết hạn (401) hoặc bị cấm (403) -> Xóa ngay lập tức
+      if (error.response && (error.response.status === 401 || error.response.status === 403)) {
+          logout(); 
+      }
     }
   };
 
-  // Check login F5
+  // --- 2. useEffect CHECK LOGIN KHI F5 ---
   useEffect(() => {
     const checkLogin = async () => {
-      const token = localStorage.getItem('accessToken');
-      
-      if (token) {
-        // Thay vì chỉ lấy từ localStorage (dữ liệu cũ), ta gọi API lấy dữ liệu mới luôn
-        await refreshProfile();
-      }
+      // Gọi hàm refreshProfile ở trên, nó đã bao gồm logic check token rồi
+      await refreshProfile();
       setLoading(false);
     };
     checkLogin();
@@ -47,14 +60,14 @@ export const AuthProvider = ({ children }) => {
       });
       const data = res.data;
 
+      // Lưu các thông tin cần thiết
       localStorage.setItem('accessToken', data.token);
       localStorage.setItem('role', data.role);
       localStorage.setItem('fullName', data.fullName);
       localStorage.setItem('userId', data.id);
       localStorage.setItem('email', data.email);
       
-      // Gọi refreshProfile để đảm bảo state user có đủ mọi trường (kycStatus, walletBalance...)
-      // thay vì chỉ vài trường cơ bản trả về lúc login
+      // Lấy lại dữ liệu đầy đủ
       await refreshProfile();
       
       return true;
@@ -66,14 +79,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
-    localStorage.clear();
-    setUser(null);
-    window.location.href = '/login';
-  };
-
   return (
-    // 3. ĐƯA refreshProfile VÀO ĐÂY ĐỂ BÊN NGOÀI DÙNG ĐƯỢC
     <AuthContext.Provider value={{ user, login, logout, loading, refreshProfile }}>
       {children}
     </AuthContext.Provider>

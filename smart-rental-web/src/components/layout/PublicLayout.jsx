@@ -1,23 +1,27 @@
-import React, { useState, useEffect } from 'react'; // Thêm useState, useEffect
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { Button, Dropdown, Space, Avatar, Badge, message, Modal } from 'antd';
+import { 
+  Button, Dropdown, Space, Avatar, Badge, message, Modal, Tag, Tooltip 
+} from 'antd';
 import { 
   UserOutlined, LogoutOutlined, HistoryOutlined, HomeOutlined, 
   HeartOutlined, MessageOutlined, BellOutlined, PlusCircleOutlined,
-  ExclamationCircleOutlined, IdcardOutlined 
+  ExclamationCircleOutlined, IdcardOutlined, 
+  SafetyCertificateOutlined, WalletOutlined, LockOutlined, DownOutlined,
+  TeamOutlined,
+  EditOutlined // <--- [MỚI] Import icon chỉnh sửa
 } from '@ant-design/icons';
 import useAuth from '../../hooks/useAuth';
 import userService from '../../services/userService'; 
-import notificationService from '../../services/notificationService'; // Import Service thông báo
+import notificationService from '../../services/notificationService';
 
 const PublicLayout = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  // --- THÊM STATE ĐẾM THÔNG BÁO ---
+  // --- 1. STATE ĐẾM THÔNG BÁO ---
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // --- GỌI API LẤY SỐ LƯỢNG KHI CÓ USER ---
   useEffect(() => {
     const fetchUnreadCount = async () => {
         if (!user) return;
@@ -34,22 +38,20 @@ const PublicLayout = () => {
     fetchUnreadCount();
   }, [user]);
 
-  // Xử lý khi nhấn nút Đăng tin
+  // --- 2. XỬ LÝ ĐĂNG TIN ---
   const handlePostAd = () => {
-    // 1. Kiểm tra đăng nhập
     if (!user) {
       message.info("Vui lòng đăng nhập để đăng tin!");
       navigate('/login');
       return;
     }
 
-    // 2. Kiểm tra Role
     if (user.role === 'LANDLORD') {
       navigate('/landlord/create-room');
     } else if (user.role === 'ADMIN') {
       message.warning("Admin không đăng tin trực tiếp.");
     } else {
-      // 3. Trường hợp là Tenant (Khách thuê)
+      // Tenant: Kiểm tra KYC
       if (user.kycStatus !== 'VERIFIED') {
         Modal.confirm({
           title: 'Yêu cầu xác minh danh tính',
@@ -67,10 +69,11 @@ const PublicLayout = () => {
         return; 
       }
 
+      // Tenant: Đã KYC -> Mời nâng cấp
       Modal.confirm({
         title: 'Kích hoạt quyền Chủ trọ',
         icon: <ExclamationCircleOutlined />,
-        content: 'Tài khoản của bạn đã được xác thực. Bạn cần nâng cấp lên "Chủ trọ" để bắt đầu đăng tin. Bạn có muốn nâng cấp ngay không?',
+        content: 'Tài khoản của bạn đã được xác thực. Bạn cần nâng cấp lên "Chủ trọ" để bắt đầu đăng tin. Nâng cấp ngay?',
         okText: 'Nâng cấp ngay',
         cancelText: 'Để sau',
         onOk: async () => {
@@ -86,24 +89,122 @@ const PublicLayout = () => {
     }
   };
 
-  const userMenu = [
-    ...(user?.role === 'TENANT' ? [
-      { key: '1', label: <Link to="/tenant/schedule">Lịch hẹn của tôi</Link>, icon: <HistoryOutlined /> },
-      { key: '2', label: <Link to="/tenant/contracts">Hợp đồng của tôi</Link>, icon: <HistoryOutlined /> }
-    ] : []),
-    ...(user?.role === 'LANDLORD' ? [
-        { key: 'landlord-1', label: <Link to="/landlord/room-list">Quản lý phòng trọ</Link>, icon: <HomeOutlined /> },
-        { key: 'landlord-2', label: <Link to="/landlord/appointments">Lịch hẹn xem phòng</Link>, icon: <HistoryOutlined /> }
-    ] : []),
-    { type: 'divider' },
-    { key: 'logout', label: <span onClick={logout}>Đăng xuất</span>, icon: <LogoutOutlined />, danger: true },
-  ];
+  // --- 3. CẤU HÌNH MENU DROPDOWN ---
+  const userMenu = {
+    items: [
+      // Banner Quảng cáo
+      {
+        key: 'banner',
+        label: (
+          <div className="w-[280px] p-1 cursor-default" onClick={(e) => e.stopPropagation()}>
+             <div className="bg-gradient-to-r from-red-600 to-red-800 rounded-lg p-3 text-white relative overflow-hidden shadow-inner">
+                <div className="relative z-10">
+                    <h4 className="text-white font-bold text-lg m-0">Gói Hội viên</h4>
+                    <p className="text-xs text-white/80 mt-1 mb-2">Tiết kiệm đến 39% chi phí</p>
+                    <Button 
+                        size="small" 
+                        className="bg-white text-red-700 border-none font-bold hover:bg-gray-100 rounded shadow-sm"
+                        onClick={() => navigate('/landlord/finance')}
+                    >
+                        Tìm hiểu thêm
+                    </Button>
+                </div>
+                <div className="absolute right-[-10px] bottom-[-10px] opacity-20">
+                    <HomeOutlined style={{ fontSize: '80px', color: 'white' }} />
+                </div>
+             </div>
+          </div>
+        ),
+        type: 'group'
+      },
+      
+      { type: 'divider' },
+
+      // Menu cho CHỦ TRỌ
+      ...(user?.role === 'LANDLORD' ? [
+        { 
+            key: 'dashboard', 
+            label: <span className="font-bold">Tổng quan <Tag color="red" className="ml-1 text-[10px]">Mới</Tag></span>, 
+            icon: <HomeOutlined />,
+            onClick: () => navigate('/landlord/dashboard')
+        },
+        { 
+            key: 'my-rooms', 
+            label: 'Quản lý tin đăng', 
+            icon: <HistoryOutlined />,
+            onClick: () => navigate('/landlord/room-list')
+        },
+        { 
+            key: 'my-customers', 
+            label: 'Danh sách Khách thuê', 
+            icon: <TeamOutlined />,
+            onClick: () => navigate('/landlord/customers')
+        },
+        { 
+            key: 'finance', 
+            label: 'Tài chính & Ví', 
+            icon: <WalletOutlined />,
+            onClick: () => navigate('/landlord/finance')
+        },
+      ] : []),
+
+      // Menu cho NGƯỜI THUÊ
+      ...(user?.role === 'TENANT' ? [
+        { 
+            key: 'my-appointments', 
+            label: 'Lịch hẹn của tôi', 
+            icon: <HistoryOutlined />,
+            onClick: () => navigate('/tenant/appointments')
+        },
+        { 
+            key: 'wishlist', 
+            label: 'Tin đã lưu', 
+            icon: <HeartOutlined />,
+            onClick: () => navigate('/tenant/wishlist')
+        },
+      ] : []),
+
+      { type: 'divider' },
+
+      // Menu CHUNG (Tài khoản) - Đã thêm mục Chỉnh sửa
+      { 
+        key: 'profile', 
+        label: 'Thông tin cá nhân', 
+        icon: <UserOutlined />,
+        onClick: () => navigate('/profile')
+      },
+      { 
+        key: 'edit-profile', 
+        label: 'Chỉnh sửa hồ sơ', // <--- [MỚI] Mục này
+        icon: <EditOutlined />,
+        onClick: () => navigate('/profile') // Điều hướng đến trang Profile (nơi có form sửa)
+      },
+      { 
+        key: 'security', 
+        label: 'Đổi mật khẩu & KYC', 
+        icon: <LockOutlined />,
+        onClick: () => navigate('/kyc')
+      },
+
+      { type: 'divider' },
+
+      // Đăng xuất
+      { 
+        key: 'logout', 
+        label: 'Đăng xuất', 
+        icon: <LogoutOutlined />, 
+        danger: true, 
+        onClick: logout 
+      },
+    ]
+  };
 
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       {/* HEADER */}
       <header className="bg-white shadow-sm sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex justify-between items-center">
+          
           {/* Logo */}
           <Link to="/" className="flex items-center gap-2 text-[#f96302] font-bold text-2xl hover:text-orange-600">
             <HomeOutlined /> SMART RENTAL
@@ -112,38 +213,31 @@ const PublicLayout = () => {
           {/* Right Section */}
           <div className="flex items-center gap-4">
             
-            {/* Các icon tiện ích (Chỉ hiện khi đã đăng nhập) */}
+            {/* Icons tiện ích (Chỉ hiện khi login) */}
             {user && (
                 <div className="hidden md:flex gap-4 mr-2 items-center">
-                    <HeartOutlined className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer"/>
-                    <MessageOutlined className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer"/>
+                    <Tooltip title="Tin đã lưu">
+                        <HeartOutlined 
+                            className="text-xl text-gray-600 hover:text-[#f96302] cursor-pointer" 
+                            onClick={() => navigate('/tenant/wishlist')}
+                        />
+                    </Tooltip>
                     
-                    {/* --- CẬP NHẬT PHẦN ICON THÔNG BÁO --- */}
                     <div 
-                        className="cursor-pointer flex items-center"
-                        onClick={() => navigate('/notifications')} // Bấm vào là chuyển trang
+                        className="cursor-pointer flex items-center" 
+                        onClick={() => navigate('/notifications')}
                     >
                         <Badge count={unreadCount} size="small" offset={[0, -5]}>
                             <BellOutlined className="text-xl text-gray-600 hover:text-[#f96302]"/>
                         </Badge>
                     </div>
-                    {/* ------------------------------------ */}
                 </div>
-            )}
-
-            {/* --- PHẦN TÁCH BIỆT CHO CHỦ TRỌ --- */}
-            {user?.role === 'LANDLORD' && (
-                <Link to="/landlord/room-list">
-                    <Button className="rounded-full font-medium border-gray-300 hover:border-[#f96302] hover:text-[#f96302]">
-                        Quản lý tin
-                    </Button>
-                </Link>
             )}
 
             {/* Nút Đăng Tin */}
             <Button 
                 type="primary" 
-                className="bg-black hover:bg-gray-800 border-none rounded-full font-bold px-6"
+                className="bg-black hover:bg-gray-800 border-none rounded-full font-bold px-6 h-9 flex items-center"
                 icon={<PlusCircleOutlined />}
                 onClick={handlePostAd}
             >
@@ -152,12 +246,18 @@ const PublicLayout = () => {
 
             {/* User Dropdown */}
             {user ? (
-              <Dropdown menu={{ items: userMenu }} placement="bottomRight">
-                <Space className="cursor-pointer hover:bg-gray-100 p-1 pr-3 rounded-full transition border border-gray-200">
+              <Dropdown 
+                menu={userMenu} 
+                placement="bottomRight" 
+                trigger={['click']} 
+                overlayClassName="w-[300px]" // Menu rộng
+              >
+                <Space className="cursor-pointer hover:bg-gray-100 py-1 px-2 rounded-full transition border border-gray-200 flex items-center gap-2">
                   <Avatar src={user.avatarUrl || user.avatar} icon={<UserOutlined />} className="bg-orange-500" />
                   <span className="hidden md:inline font-medium text-gray-700 max-w-[100px] truncate">
                     {user.fullName}
                   </span>
+                  <DownOutlined className="text-[10px] text-gray-400"/>
                 </Space>
               </Dropdown>
             ) : (

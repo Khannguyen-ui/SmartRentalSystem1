@@ -9,12 +9,12 @@ import {
   EnvironmentOutlined, HeartOutlined, UserOutlined, FilterOutlined,
   AppstoreOutlined, UnorderedListOutlined, EnvironmentFilled, HomeFilled,
   DownOutlined, CameraFilled, CheckOutlined,
-  RightOutlined, SearchOutlined
+  RightOutlined, SearchOutlined, AimOutlined // <--- 1. ĐÃ THÊM IMPORT AimOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
 import 'dayjs/locale/vi';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import roomService from '../../services/roomService';
 import userService from '../../services/userService';
@@ -53,7 +53,6 @@ const NearbyAmenitiesContent = ({ onClose, onApply }) => {
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(2000); // Mặc định 2km
 
-  // Gợi ý các từ khóa địa điểm phổ biến để người dùng tìm phòng gần đó
   const quickTags = [
     { label: 'ĐH Hutech', search: 'Đại học Hutech' },
     { label: 'ĐH Bách Khoa', search: 'Đại học Bách Khoa TP HCM' },
@@ -62,18 +61,17 @@ const NearbyAmenitiesContent = ({ onClose, onApply }) => {
     { label: 'Landmark 81', search: 'Landmark 81' },
   ];
 
-  // Tìm tọa độ của địa điểm (để làm tâm quét phòng trọ)
   const searchLocationAnchor = async (query) => {
     if (!query) return;
     setLoading(true);
     try {
       const res = await axios.get('https://nominatim.openstreetmap.org/search', {
-        params: { 
-            q: query, 
-            format: 'json', 
-            addressdetails: 1, 
-            limit: 5, 
-            countrycodes: 'vn' 
+        params: {
+          q: query,
+          format: 'json',
+          addressdetails: 1,
+          limit: 5,
+          countrycodes: 'vn'
         }
       });
       setSuggestions(res.data);
@@ -85,10 +83,9 @@ const NearbyAmenitiesContent = ({ onClose, onApply }) => {
   };
 
   const handleSelectAnchor = (place) => {
-    // Khi chọn địa điểm, ta lấy tọa độ đó để lọc phòng
     const shortName = place.name || place.display_name.split(',')[0];
     onApply({
-      name: shortName, // Tên hiển thị trên nút lọc
+      name: shortName,
       fullText: place.display_name,
       lat: parseFloat(place.lat),
       lng: parseFloat(place.lon),
@@ -100,164 +97,178 @@ const NearbyAmenitiesContent = ({ onClose, onApply }) => {
   return (
     <div className="w-[380px] p-3 bg-white font-sans">
       <div className="text-center mb-4">
-          <h4 className="font-bold text-gray-800 text-base m-0">Bạn muốn tìm phòng ở gần đâu?</h4>
-          <span className="text-xs text-gray-500">Nhập trường học, công ty, bệnh viện... để xem phòng quanh đó</span>
+        <h4 className="font-bold text-gray-800 text-base m-0">Bạn muốn tìm phòng ở gần đâu?</h4>
+        <span className="text-xs text-gray-500">Nhập trường học, công ty, bệnh viện... để xem phòng quanh đó</span>
       </div>
-      
-      {/* Ô nhập liệu */}
+
       <div className="flex gap-2 mb-3">
-        <Input 
-          placeholder="VD: Đại học FPT, Aeon Mall Tân Phú..." 
+        <Input
+          placeholder="VD: Đại học FPT, Aeon Mall Tân Phú..."
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
           onPressEnter={() => searchLocationAnchor(keyword)}
-          prefix={<EnvironmentOutlined className="text-[#f96302]"/>}
+          prefix={<EnvironmentOutlined className="text-[#f96302]" />}
           className="rounded-md"
         />
         <Button type="primary" loading={loading} onClick={() => searchLocationAnchor(keyword)}>
-            Quét phòng
+          Quét phòng
         </Button>
       </div>
 
-      {/* Gợi ý nhanh */}
       <div className="mb-4">
         <div className="text-xs text-gray-400 mb-2">Gợi ý điểm đến phổ biến:</div>
         <div className="flex flex-wrap gap-2">
-            {quickTags.map((tag, idx) => (
-            <Tag 
-                key={idx} 
-                className="cursor-pointer hover:border-[#f96302] hover:text-[#f96302] transition-all px-2 py-1 bg-gray-50 border-gray-200"
-                onClick={() => { 
-                    setKeyword(tag.search); 
-                    searchLocationAnchor(tag.search); 
-                }}
+          {quickTags.map((tag, idx) => (
+            <Tag
+              key={idx}
+              className="cursor-pointer hover:border-[#f96302] hover:text-[#f96302] transition-all px-2 py-1 bg-gray-50 border-gray-200"
+              onClick={() => {
+                setKeyword(tag.search);
+                searchLocationAnchor(tag.search);
+              }}
             >
-                {tag.label}
+              {tag.label}
             </Tag>
-            ))}
+          ))}
         </div>
       </div>
 
       <Divider style={{ margin: '12px 0' }} />
 
-      {/* Slider bán kính */}
       <div className="mb-4 px-1">
         <div className="flex justify-between text-xs text-gray-600 mb-1">
           <span>Tìm phòng trong bán kính:</span>
-          <span className="font-bold text-[#f96302]">{radius < 1000 ? `${radius}m` : `${radius/1000}km`}</span>
+          <span className="font-bold text-[#f96302]">{radius < 1000 ? `${radius}m` : `${radius / 1000}km`}</span>
         </div>
-        <Slider 
-          min={500} max={10000} step={500} 
+        <Slider
+          min={500} max={10000} step={500}
           value={radius} onChange={setRadius}
-          trackStyle={{ backgroundColor: '#f96302' }} 
+          trackStyle={{ backgroundColor: '#f96302' }}
           handleStyle={{ borderColor: '#f96302', backgroundColor: '#f96302', boxShadow: 'none' }}
         />
       </div>
 
-      {/* Danh sách kết quả gợi ý địa điểm */}
       {suggestions.length > 0 && (
-          <div className="border border-gray-100 rounded-md overflow-hidden">
-             <div className="bg-gray-50 px-3 py-1.5 text-xs text-gray-500 font-medium border-b border-gray-100">
-                 Chọn địa điểm chính xác để quét phòng:
-             </div>
-             <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
-                {suggestions.map((item) => (
-                <div 
-                    key={item.place_id} 
-                    className="p-2.5 hover:bg-orange-50 cursor-pointer border-b border-gray-50 last:border-0 flex gap-3 items-start transition-colors group"
-                    onClick={() => handleSelectAnchor(item)}
-                >
-                    <EnvironmentFilled className="mt-1 text-gray-300 group-hover:text-[#f96302]" />
-                    <div>
-                    <div className="font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-[#f96302]">
-                        {item.name || item.display_name.split(',')[0]}
-                    </div>
-                    <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">
-                        {item.display_name}
-                    </div>
-                    </div>
+        <div className="border border-gray-100 rounded-md overflow-hidden">
+          <div className="bg-gray-50 px-3 py-1.5 text-xs text-gray-500 font-medium border-b border-gray-100">
+            Chọn địa điểm chính xác để quét phòng:
+          </div>
+          <div className="max-h-[180px] overflow-y-auto custom-scrollbar">
+            {suggestions.map((item) => (
+              <div
+                key={item.place_id}
+                className="p-2.5 hover:bg-orange-50 cursor-pointer border-b border-gray-50 last:border-0 flex gap-3 items-start transition-colors group"
+                onClick={() => handleSelectAnchor(item)}
+              >
+                <EnvironmentFilled className="mt-1 text-gray-300 group-hover:text-[#f96302]" />
+                <div>
+                  <div className="font-bold text-sm text-gray-800 line-clamp-1 group-hover:text-[#f96302]">
+                    {item.name || item.display_name.split(',')[0]}
+                  </div>
+                  <div className="text-xs text-gray-500 line-clamp-2 mt-0.5">
+                    {item.display_name}
+                  </div>
                 </div>
-                ))}
-            </div>
+              </div>
+            ))}
           </div>
+        </div>
       )}
-      
+
       {suggestions.length === 0 && !loading && keyword && (
-          <div className="text-center text-gray-400 text-sm py-4 italic">
-              Không tìm thấy địa điểm này. Hãy thử từ khóa khác (VD: Quận, Đường...)
-          </div>
+        <div className="text-center text-gray-400 text-sm py-4 italic">
+          Không tìm thấy địa điểm này. Hãy thử từ khóa khác (VD: Quận, Đường...)
+        </div>
       )}
     </div>
   );
 };
-// ==============================================================================
 
 // --- CÁC COMPONENT POPOVER TÌM KIẾM CŨ ---
 const LocationSelectContent = ({ onClose, onApply }) => {
-    const [provinces, setProvinces] = useState([]);
-    const [districts, setDistricts] = useState([]);
-    const [wards, setWards] = useState([]);
-    const [tempProv, setTempProv] = useState(null);
-    const [tempDist, setTempDist] = useState(null);
-    const [tempWard, setTempWard] = useState(null);
-  
-    useEffect(() => { axios.get('https://provinces.open-api.vn/api/?depth=1').then(res => setProvinces(res.data)); }, []);
-  
-    const handleProvChange = async (val, opt) => {
-      setTempProv({ code: val, name: opt.children }); setTempDist(null); setTempWard(null);
-      const res = await axios.get(`https://provinces.open-api.vn/api/p/${val}?depth=2`); setDistricts(res.data.districts);
-    };
-    const handleDistChange = async (val, opt) => {
-      setTempDist({ code: val, name: opt.children }); setTempWard(null);
-      const res = await axios.get(`https://provinces.open-api.vn/api/d/${val}?depth=2`); setWards(res.data.wards);
-    };
-    const handleApply = () => {
-      const fullText = [tempWard?.name, tempDist?.name, tempProv?.name].filter(Boolean).join(', ');
-      onApply({ province: tempProv, district: tempDist, ward: tempWard, fullText, displayName: fullText || "Toàn quốc" }); onClose();
-    };
-  
-    return (
-      <div className="w-[320px] p-1">
-        <h4 className="font-bold mb-3 text-center text-gray-700">Chọn khu vực tìm kiếm</h4>
-        <div className="flex flex-col gap-3">
-          <Select showSearch placeholder="Tỉnh/Thành" className="w-full" onChange={handleProvChange} optionFilterProp="children">{provinces.map(p => <Option key={p.code} value={p.code}>{p.name}</Option>)}</Select>
-          <Select showSearch placeholder="Quận/Huyện" className="w-full" onChange={handleDistChange} disabled={!tempProv} value={tempDist?.code} optionFilterProp="children">{districts.map(d => <Option key={d.code} value={d.code}>{d.name}</Option>)}</Select>
-          <Select showSearch placeholder="Phường/Xã" className="w-full" onChange={(val, opt) => setTempWard({ code: val, name: opt.children })} disabled={!tempDist} value={tempWard?.code} optionFilterProp="children">{wards.map(w => <Option key={w.code} value={w.code}>{w.name}</Option>)}</Select>
-          <Button type="primary" className="mt-2 font-bold h-10 w-full rounded-md" onClick={handleApply}>Áp dụng</Button>
-        </div>
+  const [provinces, setProvinces] = useState([]);
+  const [districts, setDistricts] = useState([]);
+  const [wards, setWards] = useState([]);
+  const [tempProv, setTempProv] = useState(null);
+  const [tempDist, setTempDist] = useState(null);
+  const [tempWard, setTempWard] = useState(null);
+
+  useEffect(() => { axios.get('https://provinces.open-api.vn/api/?depth=1').then(res => setProvinces(res.data)); }, []);
+
+  const handleProvChange = async (val, opt) => {
+    setTempProv({ code: val, name: opt.children }); setTempDist(null); setTempWard(null);
+    const res = await axios.get(`https://provinces.open-api.vn/api/p/${val}?depth=2`); setDistricts(res.data.districts);
+  };
+  const handleDistChange = async (val, opt) => {
+    setTempDist({ code: val, name: opt.children }); setTempWard(null);
+    const res = await axios.get(`https://provinces.open-api.vn/api/d/${val}?depth=2`); setWards(res.data.wards);
+  };
+  const handleApply = () => {
+    const fullText = [tempWard?.name, tempDist?.name, tempProv?.name].filter(Boolean).join(', ');
+    onApply({ province: tempProv, district: tempDist, ward: tempWard, fullText, displayName: fullText || "Toàn quốc" }); onClose();
+  };
+
+  return (
+    <div className="w-[320px] p-1">
+      <h4 className="font-bold mb-3 text-center text-gray-700">Chọn khu vực tìm kiếm</h4>
+      <div className="flex flex-col gap-3">
+        <Select showSearch placeholder="Tỉnh/Thành" className="w-full" onChange={handleProvChange} optionFilterProp="children">{provinces.map(p => <Option key={p.code} value={p.code}>{p.name}</Option>)}</Select>
+        <Select showSearch placeholder="Quận/Huyện" className="w-full" onChange={handleDistChange} disabled={!tempProv} value={tempDist?.code} optionFilterProp="children">{districts.map(d => <Option key={d.code} value={d.code}>{d.name}</Option>)}</Select>
+        <Select showSearch placeholder="Phường/Xã" className="w-full" onChange={(val, opt) => setTempWard({ code: val, name: opt.children })} disabled={!tempDist} value={tempWard?.code} optionFilterProp="children">{wards.map(w => <Option key={w.code} value={w.code}>{w.name}</Option>)}</Select>
+        <Button type="primary" className="mt-2 font-bold h-10 w-full rounded-md" onClick={handleApply}>Áp dụng</Button>
       </div>
-    );
+    </div>
+  );
 };
-  
+
 const TypeSelectContent = ({ currentType, onClose, onApply }) => {
-    const options = [
-      { label: 'Tất cả phòng trọ', value: 'ALL' },
-      { label: 'Thuê nguyên căn', value: 'WHOLE' },
-      { label: 'Ở ghép (KTX)', value: 'SHARED' }
-    ];
-    return (
-      <div className="w-[200px] p-1">
-        <div className="flex flex-col gap-2">
-          {options.map(opt => (
-            <div key={opt.value} className="flex justify-between cursor-pointer p-2 hover:bg-gray-50 rounded" onClick={() => { onApply(opt.value); onClose(); }}>
-              <span className={currentType === opt.value ? "font-bold text-[#f96302]" : "text-gray-600"}>{opt.label}</span>
-              {currentType === opt.value && <CheckOutlined className="text-[#f96302]" />}
-            </div>
-          ))}
-        </div>
+  const options = [
+    { label: 'Tất cả phòng trọ', value: 'ALL' },
+    { label: 'Thuê nguyên căn', value: 'WHOLE' },
+    { label: 'Ở ghép (KTX)', value: 'SHARED' }
+  ];
+  return (
+    <div className="w-[200px] p-1">
+      <div className="flex flex-col gap-2">
+        {options.map(opt => (
+          <div key={opt.value} className="flex justify-between cursor-pointer p-2 hover:bg-gray-50 rounded" onClick={() => { onApply(opt.value); onClose(); }}>
+            <span className={currentType === opt.value ? "font-bold text-[#f96302]" : "text-gray-600"}>{opt.label}</span>
+            {currentType === opt.value && <CheckOutlined className="text-[#f96302]" />}
+          </div>
+        ))}
       </div>
-    );
+    </div>
+  );
 };
 
 const FilterPage = () => {
   const location = useLocation();
   const navigate = useNavigate();
+  // Sử dụng useSearchParams để đọc/ghi URL
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  // State khởi tạo từ trang trước
-  const initialState = location.state || {
-    keyword: '', type: 'ALL', locationName: 'Hồ Chí Minh',
-    locationCoords: { lat: 10.7769, lng: 106.7009 }, radius: 20000
+  // State khởi tạo từ trang trước hoặc URL
+  const getInitialFilters = () => {
+    const lat = searchParams.get('lat');
+    const lng = searchParams.get('lng');
+
+    if (lat && lng) {
+      return {
+        keyword: searchParams.get('keyword') || '',
+        type: searchParams.get('type') || 'ALL',
+        locationName: searchParams.get('locationName') || 'Vị trí đã chọn',
+        locationCoords: { lat: parseFloat(lat), lng: parseFloat(lng) },
+        radius: parseInt(searchParams.get('radius') || '20000')
+      };
+    }
+    // Fallback location.state
+    return location.state || {
+      keyword: '', type: 'ALL', locationName: 'Hồ Chí Minh',
+      locationCoords: { lat: 10.7769, lng: 106.7009 }, radius: 20000
+    };
   };
+
+  const [filters, setFilters] = useState(getInitialFilters);
 
   // State quản lý dữ liệu
   const [loading, setLoading] = useState(false);
@@ -266,7 +277,6 @@ const FilterPage = () => {
   const [topLandlords, setTopLandlords] = useState([]);
 
   const [viewMode, setViewMode] = useState('list');
-  const [filters, setFilters] = useState(initialState);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(6);
 
@@ -283,6 +293,14 @@ const FilterPage = () => {
   const [selectedDirection, setSelectedDirection] = useState([]);
   const [selectedFurniture, setSelectedFurniture] = useState(null);
 
+  // Lắng nghe URL thay đổi để update state
+  useEffect(() => {
+    const lat = searchParams.get('lat');
+    if (lat) {
+      setFilters(getInitialFilters());
+    }
+  }, [searchParams]);
+
   // --- GỌI API LẤY PHÒNG ---
   useEffect(() => {
     fetchRooms();
@@ -291,21 +309,21 @@ const FilterPage = () => {
   // --- GỌI API LẤY CHỦ TRỌ NỔI BẬT ---
   useEffect(() => {
     const fetchTopLandlords = async () => {
-        if (!filters.locationCoords) return;
-        try {
-            const res = await userService.getTopLandlords(
-                filters.locationCoords.lat,
-                filters.locationCoords.lng,
-                filters.radius || 20000
-            );
-            setTopLandlords(res.data);
-        } catch (error) {
-            console.error("Lỗi lấy top chủ trọ", error);
-        }
+      if (!filters.locationCoords) return;
+      try {
+        const res = await userService.getTopLandlords(
+          filters.locationCoords.lat,
+          filters.locationCoords.lng,
+          filters.radius || 20000
+        );
+        setTopLandlords(res.data);
+      } catch (error) {
+        console.error("Lỗi lấy top chủ trọ", error);
+      }
     };
     fetchTopLandlords();
-  }, [filters.locationCoords]); 
-  
+  }, [filters.locationCoords]);
+
   // Xử lý phân trang Client-side
   useEffect(() => {
     const startIndex = (currentPage - 1) * pageSize;
@@ -365,16 +383,24 @@ const FilterPage = () => {
     if (!locData.fullText) return;
     message.loading({ content: `Đang tìm vị trí...`, key: 'geo' });
     try {
-        const geocode = async (q) => (await axios.get(`https://nominatim.openstreetmap.org/search`, { params: { q, format: 'json', limit: 1, countrycodes: 'vn' } })).data?.[0];
-        let result = await geocode(locData.fullText);
-        if (!result && locData.district) result = await geocode(`${locData.district.name}, ${locData.province.name}`);
-        if (!result && locData.province) result = await geocode(locData.province.name);
+      const geocode = async (q) => (await axios.get(`https://nominatim.openstreetmap.org/search`, { params: { q, format: 'json', limit: 1, countrycodes: 'vn' } })).data?.[0];
+      let result = await geocode(locData.fullText);
+      if (!result && locData.district) result = await geocode(`${locData.district.name}, ${locData.province.name}`);
+      if (!result && locData.province) result = await geocode(locData.province.name);
 
-        if (result) {
-            const newCoords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
-            setFilters(prev => ({ ...prev, locationName: locData.displayName, locationCoords: newCoords, radius: 10000 }));
-            message.success({ content: `Đã chuyển đến: ${locData.displayName}`, key: 'geo' });
-        } else { message.warning({ content: 'Không tìm thấy tọa độ!', key: 'geo' }); }
+      if (result) {
+        const newCoords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
+        setFilters(prev => ({ ...prev, locationName: locData.displayName, locationCoords: newCoords, radius: 10000 }));
+        setSearchParams({
+          locationName: locData.displayName,
+          lat: newCoords.lat,
+          lng: newCoords.lng,
+          radius: 10000,
+          type: filters.type,
+          keyword: filters.keyword
+        });
+        message.success({ content: `Đã chuyển đến: ${locData.displayName}`, key: 'geo' });
+      } else { message.warning({ content: 'Không tìm thấy tọa độ!', key: 'geo' }); }
     } catch (e) { message.error({ content: 'Lỗi bản đồ', key: 'geo' }); }
   };
 
@@ -386,12 +412,12 @@ const FilterPage = () => {
       locationCoords: { lat: data.lat, lng: data.lng },
       radius: data.radius
     }));
+    setSearchParams({ locationName: `Gần ${data.name}`, lat: data.lat, lng: data.lng, radius: data.radius, type: filters.type, keyword: filters.keyword });
     message.success(`Đang quét phòng quanh ${data.name} (${data.radius}m)`);
   };
 
   // --- HÀM RESET TOÀN BỘ BỘ LỌC (MỚI) ---
   const handleResetAll = () => {
-    // 1. Reset các bộ lọc nâng cao
     setPriceRange([0, 100000000]);
     setSelectedBedrooms([]);
     setSelectedBathrooms([]);
@@ -399,7 +425,7 @@ const FilterPage = () => {
     setSelectedDirection([]);
     setSelectedFurniture(null);
 
-    // 2. Reset bộ lọc chính (Vị trí, Từ khóa, Loại phòng) về mặc định (HCM)
+    // Reset bộ lọc chính (Vị trí, Từ khóa, Loại phòng) về mặc định (HCM)
     setFilters({
       keyword: '',
       type: 'ALL',
@@ -407,7 +433,7 @@ const FilterPage = () => {
       locationCoords: { lat: 10.7769, lng: 106.7009 },
       radius: 20000
     });
-
+    setSearchParams({}); // Xóa sạch URL params
     message.success("Đã đặt lại toàn bộ bộ lọc");
   };
 
@@ -415,7 +441,7 @@ const FilterPage = () => {
   const renderCheckboxFilter = (options, selected, setSelected, placeholder) => (
     <div className="w-[300px] flex flex-col bg-white">
       <div className="p-3 border-b border-gray-100">
-        <Input prefix={<SearchOutlined className="text-gray-500" />} placeholder={placeholder} className="rounded-full bg-white border-gray-300"/>
+        <Input prefix={<SearchOutlined className="text-gray-500" />} placeholder={placeholder} className="rounded-full bg-white border-gray-300" />
       </div>
       <div className="max-h-[320px] overflow-y-auto custom-scrollbar">
         {options.map((opt) => (
@@ -435,9 +461,9 @@ const FilterPage = () => {
   const areaContent = (
     <div className="w-[320px] p-4 bg-white">
       <div className="flex items-center gap-2 mb-4">
-        <InputNumber className="w-full rounded-md py-1" placeholder="Min" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} onChange={(val) => setAreaRange({ ...areaRange, min: val })} value={areaRange.min}/>
+        <InputNumber className="w-full rounded-md py-1" placeholder="Min" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} onChange={(val) => setAreaRange({ ...areaRange, min: val })} value={areaRange.min} />
         <span className="text-gray-400">-</span>
-        <InputNumber className="w-full rounded-md py-1" placeholder="Max" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} onChange={(val) => setAreaRange({ ...areaRange, max: val })} value={areaRange.max}/>
+        <InputNumber className="w-full rounded-md py-1" placeholder="Max" formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')} parser={value => value.replace(/\$\s?|(,*)/g, '')} onChange={(val) => setAreaRange({ ...areaRange, max: val })} value={areaRange.max} />
       </div>
       <div className="flex gap-3">
         <Button className="flex-1 border-gray-300 text-gray-700 font-medium h-9" onClick={() => setAreaRange({ min: null, max: null })}>Xóa lọc</Button>
@@ -469,7 +495,7 @@ const FilterPage = () => {
 
   const priceContent = (
     <div className="w-[300px] p-2">
-      <Slider range min={0} max={100000000} step={500000} value={priceRange} onChange={setPriceRange} trackStyle={{ backgroundColor: '#f96302' }} handleStyle={{ borderColor: '#f96302', backgroundColor: '#f96302' }}/>
+      <Slider range min={0} max={100000000} step={500000} value={priceRange} onChange={setPriceRange} trackStyle={{ backgroundColor: '#f96302' }} handleStyle={{ borderColor: '#f96302', backgroundColor: '#f96302' }} />
       <div className="flex justify-between items-center text-sm font-medium mb-4"><span>0</span><span>100 triệu</span></div>
       <div className="flex gap-2 mb-4">
         <div className="border rounded px-2 py-1 flex-1 text-center bg-gray-50 text-xs">{formatCurrency(priceRange[0])}</div>
@@ -557,56 +583,97 @@ const FilterPage = () => {
   return (
     <ConfigProvider theme={{ token: { colorPrimary: '#f96302', borderRadius: 4, fontFamily: 'Arial, sans-serif' } }}>
       <div className="min-h-screen bg-[#f4f4f4] pb-10 font-sans">
-        
+
         {/* HEADER FILTERS */}
         <div className="bg-white pt-4 pb-2 sticky top-0 z-50 shadow-sm">
+
+          {/* ================================================================= */}
+          {/* 2. ĐÃ THÊM THANH TÌM KIẾM VÀ NÚT BẢN ĐỒ Ở ĐÂY */}
+          {/* ================================================================= */}
+          <div className="max-w-7xl mx-auto px-4 mb-4">
+            <div className="flex gap-2">
+              <Input.Search
+                placeholder="Tìm kiếm theo tên phòng, địa chỉ..."
+                allowClear
+                enterButton="Tìm kiếm"
+                size="large"
+                className="flex-grow custom-search-input"
+                value={filters.keyword}
+                onChange={(e) => setFilters(prev => ({ ...prev, keyword: e.target.value }))}
+                onSearch={() => {
+                  // Cập nhật URL khi nhấn tìm kiếm
+                  setSearchParams({
+                    ...Object.fromEntries(searchParams),
+                    keyword: filters.keyword,
+                    type: filters.type,
+                    locationName: filters.locationName,
+                    lat: filters.locationCoords.lat,
+                    lng: filters.locationCoords.lng,
+                    radius: filters.radius
+                  });
+                  fetchRooms(); // Gọi API lại
+                }}
+              />
+              <Button
+                size="large"
+                type="default"
+                icon={<AimOutlined />}
+                onClick={() => navigate('/search')}
+                className="flex items-center"
+              >
+                Bản đồ
+              </Button>
+            </div>
+          </div>
+          {/* ================================================================= */}
+
           <div className="max-w-7xl mx-auto px-4">
             <h1 className="text-lg font-bold mb-3">
-                 {filters.locationName.startsWith('Gần') 
-                    ? <span>Phòng trọ xung quanh <span className="text-[#f96302]">{filters.locationName.replace('Gần ', '')}</span></span>
-                    : `Kết quả tìm kiếm tại ${filters.locationName}`}
+              {filters.locationName.startsWith('Gần')
+                ? <span>Phòng trọ xung quanh <span className="text-[#f96302]">{filters.locationName.replace('Gần ', '')}</span></span>
+                : `Kết quả tìm kiếm tại ${filters.locationName}`}
             </h1>
-            
+
             <div className="flex flex-wrap gap-2 items-center mb-3">
               <Button className="bg-gray-100 border-none font-medium flex items-center gap-1 rounded-full px-4 hover:bg-gray-200"><FilterOutlined /> Lọc</Button>
-              
+
               <Popover placement="bottomLeft" content={<LocationSelectContent onClose={() => setOpenLocation(false)} onApply={handleApplyLocation} />} trigger="click" open={openLocation} onOpenChange={setOpenLocation} arrow={false}>
                 <Button className="bg-gray-100 border-none font-medium flex items-center gap-1 rounded-full px-4 hover:bg-gray-200">
-                    <EnvironmentFilled className="text-[#f96302]" /> <span className="truncate max-w-[120px]">{filters.locationName}</span> <DownOutlined className="text-[10px]"/>
+                  <EnvironmentFilled className="text-[#f96302]" /> <span className="truncate max-w-[120px]">{filters.locationName}</span> <DownOutlined className="text-[10px]" />
                 </Button>
               </Popover>
 
-              <Popover 
-                placement="bottomLeft" 
-                content={<NearbyAmenitiesContent onClose={() => setOpenAmenities(false)} onApply={handleApplyAmenities} />} 
-                trigger="click" 
-                open={openAmenities} 
-                onOpenChange={setOpenAmenities} 
+              <Popover
+                placement="bottomLeft"
+                content={<NearbyAmenitiesContent onClose={() => setOpenAmenities(false)} onApply={handleApplyAmenities} />}
+                trigger="click"
+                open={openAmenities}
+                onOpenChange={setOpenAmenities}
                 arrow={false}
               >
                 <Button className="bg-blue-50 text-blue-600 border-blue-200 font-medium flex items-center gap-1 rounded-full px-4 hover:bg-blue-100">
-                    <EnvironmentOutlined /> <span>Tiện ích quanh đây</span> <DownOutlined className="text-[10px]"/>
+                  <EnvironmentOutlined /> <span>Tiện ích quanh đây</span> <DownOutlined className="text-[10px]" />
                 </Button>
               </Popover>
 
-              <Popover placement="bottomLeft" content={<TypeSelectContent currentType={filters.type} onClose={() => setOpenType(false)} onApply={(val) => { setFilters({...filters, type: val}); }} />} trigger="click" open={openType} onOpenChange={setOpenType} arrow={false}>
+              <Popover placement="bottomLeft" content={<TypeSelectContent currentType={filters.type} onClose={() => setOpenType(false)} onApply={(val) => { setFilters({ ...filters, type: val }); setSearchParams({ ...Object.fromEntries(searchParams), type: val }); }} />} trigger="click" open={openType} onOpenChange={setOpenType} arrow={false}>
                 <Button className="bg-gray-100 border-none font-medium flex items-center gap-1 rounded-full px-4 hover:bg-gray-200">
-                    <HomeFilled className="text-[#f96302]" /> <span>Loại phòng</span> <DownOutlined className="text-[10px]"/>
+                  <HomeFilled className="text-[#f96302]" /> <span>Loại phòng</span> <DownOutlined className="text-[10px]" />
                 </Button>
               </Popover>
 
-              <Popover placement="bottomLeft" content={priceContent} trigger="click"><div className="bg-gray-100 px-4 py-1.5 rounded-full text-sm text-gray-700 cursor-pointer hover:bg-gray-200 flex items-center gap-1 transition-colors">Giá thuê <DownOutlined className="text-[10px]"/></div></Popover>
-              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(BEDROOM_OPTIONS, selectedBedrooms, setSelectedBedrooms, "Tìm số PN")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedBedrooms.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedBedrooms.length > 0 ? `PN: ${selectedBedrooms.join(',')}` : 'Số phòng ngủ'} <DownOutlined className="text-[10px]"/></div></Popover>
-              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(BATHROOM_OPTIONS, selectedBathrooms, setSelectedBathrooms, "Tìm số WC")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedBathrooms.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedBathrooms.length > 0 ? `WC: ${selectedBathrooms.join(',')}` : 'Số phòng vệ sinh'} <DownOutlined className="text-[10px]"/></div></Popover>
-              <Popover placement="bottomLeft" content={areaContent} trigger="click"><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${areaRange.min || areaRange.max ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Diện tích <DownOutlined className="text-[10px]"/></div></Popover>
-              <Popover placement="bottomLeft" content={furnitureContent} trigger="click"><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedFurniture ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedFurniture ? selectedFurniture : 'Tình trạng nội thất'} <DownOutlined className="text-[10px]"/></div></Popover>
-              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(DIRECTION_OPTIONS, selectedDirection, setSelectedDirection, "Tìm kiếm Hướng")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedDirection.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedDirection.length > 0 ? (selectedDirection[0] + (selectedDirection.length > 1 ? ` (+${selectedDirection.length - 1})` : '')) : 'Hướng'} <DownOutlined className="text-[10px]"/></div></Popover>
-              
+              <Popover placement="bottomLeft" content={priceContent} trigger="click"><div className="bg-gray-100 px-4 py-1.5 rounded-full text-sm text-gray-700 cursor-pointer hover:bg-gray-200 flex items-center gap-1 transition-colors">Giá thuê <DownOutlined className="text-[10px]" /></div></Popover>
+              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(BEDROOM_OPTIONS, selectedBedrooms, setSelectedBedrooms, "Tìm số PN")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedBedrooms.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedBedrooms.length > 0 ? `PN: ${selectedBedrooms.join(',')}` : 'Số phòng ngủ'} <DownOutlined className="text-[10px]" /></div></Popover>
+              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(BATHROOM_OPTIONS, selectedBathrooms, setSelectedBathrooms, "Tìm số WC")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedBathrooms.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedBathrooms.length > 0 ? `WC: ${selectedBathrooms.join(',')}` : 'Số phòng vệ sinh'} <DownOutlined className="text-[10px]" /></div></Popover>
+              <Popover placement="bottomLeft" content={areaContent} trigger="click"><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${areaRange.min || areaRange.max ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>Diện tích <DownOutlined className="text-[10px]" /></div></Popover>
+              <Popover placement="bottomLeft" content={furnitureContent} trigger="click"><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedFurniture ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedFurniture ? selectedFurniture : 'Tình trạng nội thất'} <DownOutlined className="text-[10px]" /></div></Popover>
+              <Popover placement="bottomLeft" trigger="click" content={renderCheckboxFilter(DIRECTION_OPTIONS, selectedDirection, setSelectedDirection, "Tìm kiếm Hướng")}><div className={`px-4 py-1.5 rounded-full text-sm cursor-pointer flex items-center gap-1 transition-colors ${selectedDirection.length > 0 ? 'bg-orange-50 text-[#f96302] border border-[#f96302]' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>{selectedDirection.length > 0 ? (selectedDirection[0] + (selectedDirection.length > 1 ? ` (+${selectedDirection.length - 1})` : '')) : 'Hướng'} <DownOutlined className="text-[10px]" /></div></Popover>
+
               <div className="flex-grow"></div>
               {/* NÚT XÓA LỌC ĐÃ CẬP NHẬT */}
               <Button type="text" danger onClick={handleResetAll}>Xoá lọc</Button>
             </div>
-            
+
             <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide select-none">
               {QUICK_FILTERS.map((item, idx) => (
                 <div key={idx} className="flex-shrink-0 bg-gray-100 text-gray-600 px-3 py-1.5 rounded-md text-sm cursor-pointer hover:bg-gray-200 font-medium whitespace-nowrap">
@@ -622,85 +689,91 @@ const FilterPage = () => {
           <Row gutter={24}>
             {/* Cột Trái: Danh sách tin */}
             <Col xs={24} md={17}>
-               <div className="flex justify-between items-center border-b border-gray-200 mb-4 pb-2">
-                  <div className="flex gap-6 text-sm font-bold">
-                    <span className="border-b-2 border-[#f96302] text-[#f96302] pb-2 cursor-pointer">Tất cả</span>
-                    <span className="text-gray-500 pb-2 cursor-pointer hover:text-black font-normal">Cá nhân</span>
-                    <span className="text-gray-500 pb-2 cursor-pointer hover:text-black font-normal">Môi giới</span>
+              <div className="flex justify-between items-center border-b border-gray-200 mb-4 pb-2">
+                <div className="flex gap-6 text-sm font-bold">
+                  <span className="border-b-2 border-[#f96302] text-[#f96302] pb-2 cursor-pointer">Tất cả</span>
+                  <span className="text-gray-500 pb-2 cursor-pointer hover:text-black font-normal">Cá nhân</span>
+                  <span className="text-gray-500 pb-2 cursor-pointer hover:text-black font-normal">Môi giới</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-gray-600">
+                  Tin mới nhất <DownOutlined className="text-[10px]" />
+                  <div className="w-[1px] h-4 bg-gray-300 mx-2"></div>
+                  <div className="flex bg-gray-100 rounded p-0.5">
+                    <Button type="text" size="small" icon={<UnorderedListOutlined />} className={viewMode === 'list' ? "bg-white shadow-sm text-[#f96302]" : "text-gray-400"} onClick={() => setViewMode('list')} />
+                    <Button type="text" size="small" icon={<AppstoreOutlined />} className={viewMode === 'grid' ? "bg-white shadow-sm text-[#f96302]" : "text-gray-400"} onClick={() => setViewMode('grid')} />
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                     Tin mới nhất <DownOutlined className="text-[10px]"/> 
-                     <div className="w-[1px] h-4 bg-gray-300 mx-2"></div>
-                     <div className="flex bg-gray-100 rounded p-0.5">
-                        <Button type="text" size="small" icon={<UnorderedListOutlined />} className={viewMode === 'list' ? "bg-white shadow-sm text-[#f96302]" : "text-gray-400"} onClick={() => setViewMode('list')}/>
-                        <Button type="text" size="small" icon={<AppstoreOutlined />} className={viewMode === 'grid' ? "bg-white shadow-sm text-[#f96302]" : "text-gray-400"} onClick={() => setViewMode('grid')}/>
-                     </div>
-                  </div>
-               </div>
+                </div>
+              </div>
 
-               {/* LIST DỮ LIỆU */}
-               {loading ? <div className="text-center py-20"><Spin size="large"/></div> : (
-                   rooms.length === 0 ? <Empty description="Không có tin đăng nào phù hợp" className="py-10 bg-white rounded"/> : 
-                   (
-                     <>
-                        {viewMode === 'list' ? renderListView() : renderGridView()}
-                        
-                        {/* --- THANH PHÂN TRANG --- */}
-                        <div className="flex justify-center mt-6">
-                            <Pagination 
-                                current={currentPage} 
-                                total={rooms.length} 
-                                pageSize={pageSize}
-                                onChange={(page) => setCurrentPage(page)}
-                                showSizeChanger={false}
-                            />
-                        </div>
-                     </>
-                   )
-               )}
+              {/* LIST DỮ LIỆU */}
+              {loading ? <div className="text-center py-20"><Spin size="large" /></div> : (
+                rooms.length === 0 ? <Empty description="Không có tin đăng nào phù hợp" className="py-10 bg-white rounded" /> :
+                  (
+                    <>
+                      {viewMode === 'list' ? renderListView() : renderGridView()}
+
+                      {/* --- THANH PHÂN TRANG --- */}
+                      <div className="flex justify-center mt-6">
+                        <Pagination
+                          current={currentPage}
+                          total={rooms.length}
+                          pageSize={pageSize}
+                          onChange={(page) => setCurrentPage(page)}
+                          showSizeChanger={false}
+                        />
+                      </div>
+                    </>
+                  )
+              )}
             </Col>
 
             {/* Cột Phải: Sidebar */}
+            {/* Cột Phải: Sidebar */}
             <Col xs={0} md={7}>
-               <div className="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200">
-                  <div className="flex items-center justify-center gap-2 mb-2 text-center">
-                      <span className="text-yellow-400 text-xl">🌿</span>
-                      <h4 className="font-bold text-gray-800 text-sm text-center">
-                          Chủ trọ nổi bật tại <br/> {filters.locationName}
-                      </h4>
-                      <span className="text-yellow-400 text-xl">🌿</span>
-                  </div>
+              <div className="bg-white p-4 rounded-lg shadow-sm mb-4 border border-gray-200">
+                <div className="flex items-center justify-center gap-2 mb-2 text-center">
+                  <span className="text-yellow-400 text-xl">🌿</span>
+                  <h4 className="font-bold text-gray-800 text-sm text-center">
+                    Chủ trọ nổi bật tại <br /> {filters.locationName}
+                  </h4>
+                  <span className="text-yellow-400 text-xl">🌿</span>
+                </div>
 
-                  <div className="flex flex-col gap-4 mt-4">
-                      {topLandlords.length === 0 ? (
-                          <div className="text-center text-gray-400 text-xs py-4">
-                              Chưa có dữ liệu nổi bật
+                <div className="flex flex-col gap-4 mt-4">
+                  {topLandlords.length === 0 ? (
+                    <div className="text-center text-gray-400 text-xs py-4">
+                      Chưa có dữ liệu nổi bật
+                    </div>
+                  ) : (
+                    topLandlords.map((landlord) => (
+                      <div 
+                        key={landlord.id} 
+                        className="flex items-center justify-between group cursor-pointer hover:bg-gray-50 p-2 rounded-md transition-colors"
+                        // --- SỬA LẠI: Đặt onClick vào trong thẻ div ---
+                        onClick={() => navigate(`/users/public-profile/${landlord.id}`)}
+                      >
+                        <div className="flex items-center gap-3">
+                          <Avatar
+                            size={40}
+                            src={landlord.avatar || "https://joesch.moe/api/v1/random"}
+                            className="border border-gray-200"
+                            icon={<UserOutlined />}
+                          />
+                          <div>
+                            <div className="text-sm font-semibold text-gray-800 group-hover:text-[#f96302] truncate max-w-[120px]">
+                              {landlord.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {landlord.postCount} tin đăng
+                            </div>
                           </div>
-                      ) : (
-                          topLandlords.map((landlord) => (
-                              <div key={landlord.id} className="flex items-center justify-between group cursor-pointer">
-                                  <div className="flex items-center gap-3">
-                                      <Avatar 
-                                          size={40} 
-                                          src={landlord.avatar || "https://joesch.moe/api/v1/random"} 
-                                          className="border border-gray-200"
-                                          icon={<UserOutlined />}
-                                      />
-                                      <div>
-                                          <div className="text-sm font-semibold text-gray-800 group-hover:text-[#f96302] truncate max-w-[120px]">
-                                              {landlord.name}
-                                          </div>
-                                          <div className="text-xs text-gray-500">
-                                              {landlord.postCount} tin đăng
-                                          </div>
-                                      </div>
-                                  </div>
-                                  <RightOutlined className="text-xs text-gray-300 group-hover:text-[#f96302]"/>
-                              </div>
-                          ))
-                      )}
-                  </div>
-               </div>
+                        </div>
+                        <RightOutlined className="text-xs text-gray-300 group-hover:text-[#f96302]" />
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </Col>
           </Row>
         </div>

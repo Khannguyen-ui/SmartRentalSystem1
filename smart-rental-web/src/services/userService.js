@@ -53,7 +53,19 @@ const userService = {
     return axiosClient.get('/users/top-landlords', { 
         params: { lat, lng, radius } 
     });
-  }
+  },
+  getLandlordPublicProfile: (id) => {
+    return axiosClient.get(`/users/public-profile/${id}`);
+  },
+  
+ 
+  getLandlordRooms: (id) => {
+    return axiosClient.get(`/rooms/landlord/${id}`); 
+  },
+  getMe: () => {
+    return axiosClient.get('/users/profile'); // Gọi đến API lấy thông tin cá nhân
+},
+
 };
 
 export default userService;

@@ -5,6 +5,7 @@ import { Outlet, useNavigate } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import useAuth from '../../hooks/useAuth';
 import notificationService from '../../services/notificationService'; // Import service để lấy số lượng
+import Footer from './Footer';
 
 const { Header, Content } = Layout;
 
@@ -105,6 +106,8 @@ const MainLayout = () => {
         <Content className="m-4 p-6 bg-white rounded-lg shadow overflow-auto">
           <Outlet />
         </Content>
+        <Footer />
+
       </Layout>
     </Layout>
   );

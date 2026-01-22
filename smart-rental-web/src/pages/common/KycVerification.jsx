@@ -82,7 +82,7 @@ const KycVerification = () => {
 
     // --- GỬI FORM ---
     const onFinish = async (values) => {
-        if (!frontImage || !backImage) {
+        if (!frontImage || !backImage) {a
             return message.error("Vui lòng tải lên đủ 2 mặt ảnh CCCD!");
         }
 

@@ -44,21 +44,28 @@ const roomService = {
   },
 
   // 8. Tìm kiếm (Dùng cho HomePage - nhận vào object filter)
-  searchRooms: (filter) => {
+    searchRooms: (filter) => {
     return axiosClient.get('/rooms/search', {
       params: {
         lat: filter.lat,
         lng: filter.lng,
-        radius: filter.radius || 50000
+        radius: filter.radius || 50000,
+       
+        address: filter.keyword 
       }
     });
   },
+
 
   // 9. Tìm kiếm gần đây (FIX LỖI: Dùng cho SearchMap - nhận vào tham số rời)
   searchNearby: (lat, lng, radius = 10000) => {
     return axiosClient.get("/rooms/search", {
       params: { lat, lng, radius }
     });
+  } ,
+  // Trang profile chủ trọ
+   getRoomsByLandlord: (landlordId) => {
+    return axiosClient.get(`/rooms/landlord/${landlordId}`);
   }
 };
 
