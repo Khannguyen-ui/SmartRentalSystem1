@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import {
     Spin, Button, Card, Tag, Image, Row, Col, message, Avatar,
     Breadcrumb, Input, Tooltip, Modal, Form, DatePicker, TimePicker,
-    Typography
+    Typography, Empty
 } from 'antd';
 import {
     ShareAltOutlined, MoreOutlined, EnvironmentOutlined, ClockCircleOutlined,
@@ -16,10 +16,10 @@ import {
     RightOutlined
 } from '@ant-design/icons';
 
-import { 
+import {
     LineChart, Line, XAxis, YAxis,
     CartesianGrid, Tooltip as ChartTooltip,
-    ResponsiveContainer, Legend 
+    ResponsiveContainer, Legend
 
 } from 'recharts';
 import { InfoCircleFilled, ArrowUpOutlined, ArrowDownOutlined } from '@ant-design/icons';
@@ -61,19 +61,19 @@ const ZaloIcon = () => (
     <img src="https://upload.wikimedia.org/wikipedia/commons/9/9f/Zalo_Authors_Logo.svg" alt="Zalo" width={20} height={20} />
 );
 const priceData = [
-  { name: 'T1/25', highest: 68, popular: 30, lowest: 18 },
-  { name: 'T2/25', highest: 56, popular: 36, lowest: 25 },
-  { name: 'T3/25', highest: 65, popular: 36, lowest: 22 },
-  { name: 'T4/25', highest: 75, popular: 33, lowest: 16 },
-  { name: 'T5/25', highest: 75, popular: 38, lowest: 20 },
-  { name: 'T6/25', highest: 73, popular: 36, lowest: 15 },
-  { name: 'T7/25', highest: 74, popular: 36, lowest: 20 },
-  { name: 'T8/25', highest: 55, popular: 34, lowest: 23 },
-  { name: 'T9/25', highest: 75, popular: 37, lowest: 23 },
-  { name: 'T10/25', highest: 72, popular: 36, lowest: 20 },
-  { name: 'T11/25', highest: 76, popular: 41, lowest: 24 },
-  { name: 'T12/25', highest: 77, popular: 42, lowest: 20 },
-  { name: 'T12/25 ', highest: 73, popular: 32, lowest: 19 },
+    { name: 'T1/25', highest: 68, popular: 30, lowest: 18 },
+    { name: 'T2/25', highest: 56, popular: 36, lowest: 25 },
+    { name: 'T3/25', highest: 65, popular: 36, lowest: 22 },
+    { name: 'T4/25', highest: 75, popular: 33, lowest: 16 },
+    { name: 'T5/25', highest: 75, popular: 38, lowest: 20 },
+    { name: 'T6/25', highest: 73, popular: 36, lowest: 15 },
+    { name: 'T7/25', highest: 74, popular: 36, lowest: 20 },
+    { name: 'T8/25', highest: 55, popular: 34, lowest: 23 },
+    { name: 'T9/25', highest: 75, popular: 37, lowest: 23 },
+    { name: 'T10/25', highest: 72, popular: 36, lowest: 20 },
+    { name: 'T11/25', highest: 76, popular: 41, lowest: 24 },
+    { name: 'T12/25', highest: 77, popular: 42, lowest: 20 },
+    { name: 'T12/25 ', highest: 73, popular: 32, lowest: 19 },
 ];
 
 const RoomDetail = () => {
@@ -91,8 +91,11 @@ const RoomDetail = () => {
     const [form] = Form.useForm();
     const [recommendedRooms, setRecommendedRooms] = useState([]);
     const [loadingRecs, setLoadingRecs] = useState(false);
+    //dữ liệu biểu đồ
+    const [historyChartData, setHistoryChartData] = useState([]);
+    const [priceStats, setPriceStats] = useState({ popular: 0, increase: 0, peakPrice: 0 });
 
-  useEffect(() => {
+    useEffect(() => {
         const fetchData = async () => {
             setLoading(true);
             try {
@@ -100,6 +103,7 @@ const RoomDetail = () => {
                 setRoom(res.data);
                 // Sau khi có dữ liệu phòng hiện tại, bắt đầu lấy phòng gợi ý
                 fetchRecommendations();
+                fetchPriceHistoryData();
             } catch (error) {
                 message.error("Không tìm thấy phòng!");
             } finally {
@@ -107,6 +111,10 @@ const RoomDetail = () => {
             }
         };
         if (id) fetchData();
+    }, [id]);
+    useEffect(() => {
+
+        window.scrollTo({ top: 0, behavior: 'smooth' });
     }, [id]);
 
     const fetchRecommendations = async () => {
@@ -129,19 +137,99 @@ const RoomDetail = () => {
                 };
             }
 
-            // 2. Gọi API search phòng dựa trên lịch sử đó
+
             const roomsRes = await roomService.searchRooms(searchParams);
-            
-            // 3. Lọc bỏ phòng hiện tại đang xem và lấy tối đa 4 phòng
-            const filtered = (roomsRes.data || [])
-                .filter(r => r.id.toString() !== id)
+            // 3. Truy cập vào .content vì Backend trả về Page Object                
+            const roomsData = roomsRes.data?.content || [];
+
+
+            const filtered = roomsData
+                .filter(r => r && r.id && r.id.toString() !== id)
                 .slice(0, 4);
-                
+
+            setRecommendedRooms(filtered);
+
             setRecommendedRooms(filtered);
         } catch (error) {
             console.error("Lỗi lấy gợi ý:", error);
         } finally {
             setLoadingRecs(false);
+        }
+    };
+    const fetchPriceHistoryData = async () => {
+        try {
+            const res = await roomService.getPriceHistory(id);
+
+            // 🟢 CẬP NHẬT: Lấy mảng history từ Object trả về
+            const rawData = res.data.history || [];
+
+            if (rawData.length === 0) return;
+
+            // 1. Xác định nhãn tháng hiện tại (Ví dụ: T1/26)
+            const currentMonthLabel = `T${dayjs().month() + 1}/${dayjs().format('YY')}`;
+
+            // 🟢 CẬP NHẬT: Ưu tiên lấy giá từ API trả về (currentRoomPrice)
+            const roomPriceTriệu = Number(res.data.currentRoomPrice || room?.price || 0) / 1000000;
+
+            // 2. Gộp dữ liệu trùng tháng (Giữ nguyên logic cũ của bạn)
+            const mergedMap = new Map();
+            rawData.forEach(item => {
+                const label = item.name || `T${item.month}/${String(item.year).slice(-2)}`;
+                mergedMap.set(label, {
+                    name: label,
+                    // Dùng toán tử || để linh hoạt giữa tên trường cũ và mới
+                    highest: Number(((item.highest || item.maxPrice || 0) / 1000000).toFixed(1)),
+                    popular: Number(((item.popular || item.avgPrice || 0) / 1000000).toFixed(1)),
+                    lowest: Number(((item.lowest || item.minPrice || 0) / 1000000).toFixed(1)),
+                    thisRoom: null
+                });
+            });
+
+            // Chuyển Map về Array
+            let formatted = Array.from(mergedMap.values());
+
+            // 3. Gán giá phòng hiện tại vào ĐÚNG tháng trên biểu đồ
+            const hasCurrentMonth = formatted.some(item => item.name === currentMonthLabel);
+
+            if (hasCurrentMonth) {
+                formatted = formatted.map(item => ({
+                    ...item,
+                    thisRoom: item.name === currentMonthLabel ? roomPriceTriệu : null
+                }));
+            } else {
+                formatted.push({
+                    name: currentMonthLabel,
+                    highest: null, popular: null, lowest: null,
+                    thisRoom: roomPriceTriệu
+                });
+            }
+
+            setHistoryChartData(formatted);
+
+            // --- Biến động giá ---
+            const realData = formatted.filter(i => i.popular !== null && i.popular > 0);
+            if (realData.length > 0) {
+                const firstPrice = realData[0].popular; // Giá tháng xa nhất
+                const latestPrice = realData[realData.length - 1].popular; // Giá tháng gần nhất
+
+                // Tính % tăng trưởng thực tế
+                const growth = firstPrice > 0
+                    ? (((latestPrice - firstPrice) / firstPrice) * 100).toFixed(1)
+                    : 0;
+
+                const peakValue = Math.max(...realData.map(i => i.highest)) || 0;
+
+                setPriceStats({
+                    popular: latestPrice,
+                    increase: growth, // Lưu con số thực tế
+                    peakPrice: peakValue,
+                    peakDate: realData.find(i => i.highest === peakValue)?.name || "",
+                    currentMonthYear: realData[realData.length - 1].name
+                });
+            }
+
+        } catch (error) {
+            console.error("Lỗi lấy lịch sử giá:", error);
         }
     };
 
@@ -241,7 +329,7 @@ const RoomDetail = () => {
                         <div className="bg-black rounded-lg overflow-hidden relative mb-2 h-[400px] flex items-center justify-center group">
                             {room.images && room.images.length > 0 ? (
                                 <Image.PreviewGroup>
-                                    <Image src={room.images[0]} className="object-contain max-h-[400px] w-full" preview={{ visible: false }} />
+                                    <Image src={room.images[0]} className="object-contain max-h-[400px] w-full" preview={{ open: false }} />
                                     <div className="hidden">
                                         {room.images.slice(1).map((img, idx) => <Image key={idx} src={img} />)}
                                     </div>
@@ -294,7 +382,7 @@ const RoomDetail = () => {
                         <Card className="shadow-sm border-none mb-4 rounded-lg">
                             <h3 className="font-bold text-lg mb-4 border-b pb-2">Đặc điểm chi tiết</h3>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4">
-                                
+
                                 {/* Cột 1 */}
                                 <div className="space-y-4">
                                     <div className="flex items-center justify-between border-b border-gray-50 pb-2">
@@ -391,7 +479,7 @@ const RoomDetail = () => {
                                 </div>
                             )}
                         </Card>
-                       <Card className="shadow-sm border-none rounded-lg mt-4">
+                        <Card className="shadow-sm border-none rounded-lg mt-4">
                             <div className="mb-4">
                                 <h3 className="font-bold text-lg mb-1">Lịch sử giá cho thuê</h3>
                                 <Text type="secondary" className="text-xs">Tại khu vực {room.address?.split(',').slice(-2).join(',')}</Text>
@@ -402,42 +490,73 @@ const RoomDetail = () => {
                                 <Col span={8}>
                                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
                                         <div className="flex items-baseline gap-1">
-                                            <span className="text-xl font-bold">32</span>
+                                            <span className="text-xl font-bold">{priceStats.popular}</span>
                                             <span className="text-xs text-gray-500">tr/tháng</span>
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-1">Giá thuê phổ biến nhất T12/25</div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Giá thuê phổ biến nhất {priceStats.currentMonthYear}</div>
                                     </div>
                                 </Col>
                                 <Col span={8}>
                                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
-                                        <div className="text-[#10b981] font-bold text-lg flex items-center gap-1">
-                                            <ArrowUpOutlined /> 10,3%
+                                        {/* 🟢 Tự động đổi màu: Xanh khi tăng (>=0), Đỏ khi giảm (<0) */}
+                                        <div className={`font-bold text-lg flex items-center gap-1 ${Number(priceStats.increase) >= 0 ? 'text-[#10b981]' : 'text-[#ef4444]'}`}>
+                                            {/* Đổi Icon tương ứng */}
+                                            {Number(priceStats.increase) >= 0 ? <ArrowUpOutlined /> : <ArrowDownOutlined />}
+                                            {Math.abs(priceStats.increase)}%
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-1">Giá thuê đã tăng trong 1 năm qua</div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Biến động khu vực</div>
                                     </div>
                                 </Col>
                                 <Col span={8}>
                                     <div className="bg-gray-50 p-3 rounded-lg border border-gray-100 h-full">
-                                        <div className="text-[#ef4444] font-bold text-lg flex items-center gap-1">
-                                            <ArrowDownOutlined /> 23,8%
+                                        <div className="flex items-baseline gap-1">
+                                            <span className="text-xl font-bold text-gray-700">{priceStats.peakPrice}</span>
+                                            <span className="text-xs text-gray-500">tr/tháng</span>
                                         </div>
-                                        <div className="text-[10px] text-gray-400 mt-1">Thấp hơn đỉnh 42tr (T11/25)</div>
+                                        <div className="text-[10px] text-gray-400 mt-1">Thấp hơn đỉnh {priceStats.peakPrice}tr ({priceStats.peakDate})</div>
                                     </div>
                                 </Col>
                             </Row>
 
                             {/* Biểu đồ */}
-                            <div className="h-64 w-full mt-4">
+                            <div style={{ width: '100%', height: 350, marginTop: 16 }}>
                                 <ResponsiveContainer width="100%" height="100%">
-                                    <LineChart data={priceData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
+                                    <LineChart data={historyChartData} margin={{ top: 10, right: 10, left: -20, bottom: 5 }}>
                                         <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#999'}} />
-                                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 10, fill: '#999'}} />
-                                        <ChartTooltip />
-                                        <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '10px' }} />
-                                        <Line type="monotone" dataKey="highest" name="Giá cao nhất" stroke="#a855f7" strokeWidth={2} dot={false} />
-                                        <Line type="monotone" dataKey="popular" name="Giá phổ biến nhất" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} activeDot={{ r: 5 }} />
-                                        <Line type="monotone" dataKey="lowest" name="Giá thấp nhất" stroke="#facc15" strokeWidth={2} dot={false} />
+                                        <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#999' }} />
+                                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 10, fill: '#999' }} unit="tr" />
+
+                                        {/* Tooltip tùy chỉnh để không hiện NaN */}
+                                        <ChartTooltip
+                                            formatter={(value, name) => {
+                                                if (value === null || isNaN(value)) return [null, null];
+                                                return [`${value} triệu`, name];
+                                            }}
+                                        />
+                                        <Legend iconType="circle" wrapperStyle={{ fontSize: '10px', paddingTop: '20px' }} />
+
+                                        {/* Các đường biểu đồ chính */}
+                                        <Line type="monotone" dataKey="highest" name="Giá cao nhất" stroke="#a855f7" strokeWidth={2} dot={false} connectNulls />
+                                        <Line type="monotone" dataKey="popular" name="Giá phổ biến" stroke="#0d9488" strokeWidth={2} dot={{ r: 3 }} connectNulls />
+                                        <Line type="monotone" dataKey="lowest" name="Giá thấp nhất" stroke="#facc15" strokeWidth={2} dot={false} connectNulls />
+
+                                        {/* 🔴 CHẤM ĐỎ GIÁ PHÒNG NÀY (LƠ LỬNG) */}
+                                        <Line
+                                            type="monotone"
+                                            dataKey="thisRoom"
+                                            name="Giá phòng này"
+                                            stroke="#ff4d4f"
+                                            strokeWidth={0} // QUAN TRỌNG: Bằng 0 để không có đường kẻ nối
+                                            dot={{
+                                                r: 8,
+                                                fill: '#ff4d4f',
+                                                stroke: '#fff',
+                                                strokeWidth: 3,
+                                                shadowBlur: 10,
+                                                shadowColor: 'rgba(0,0,0,0.2)'
+                                            }}
+                                            activeDot={{ r: 10 }}
+                                        />
                                     </LineChart>
                                 </ResponsiveContainer>
                             </div>
@@ -446,7 +565,7 @@ const RoomDetail = () => {
                             <div className="mt-6 bg-purple-50 p-3 rounded-lg flex gap-3 items-start">
                                 <InfoCircleFilled className="text-purple-400 mt-1" />
                                 <p className="text-[10px] text-purple-700 m-0 leading-relaxed">
-                                    Dữ liệu giá được tổng hợp và xử lý từ các tin đăng trên hệ thống Smart Rental. 
+                                    Dữ liệu giá được tổng hợp và xử lý từ các tin đăng trên hệ thống Smart Rental.
                                     Bạn hãy lưu ý về tin đăng nằm ngoài khoảng giá chúng tôi gợi ý để cân nhắc kỹ trước khi giao dịch.
                                 </p>
                             </div>
@@ -574,8 +693,8 @@ const RoomDetail = () => {
                                             className="rounded-lg overflow-hidden border-none shadow-sm h-full flex flex-col"
                                             cover={
                                                 <div className="h-40 overflow-hidden relative">
-                                                    <img 
-                                                        src={item.images?.[0] || 'https://via.placeholder.com/300'} 
+                                                    <img
+                                                        src={item.images?.[0] || 'https://placehold.co/300x200?text=No+Image'}
                                                         className="w-full h-full object-cover"
                                                         alt="rec"
                                                     />

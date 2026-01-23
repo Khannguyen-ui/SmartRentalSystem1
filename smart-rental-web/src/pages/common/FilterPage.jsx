@@ -9,7 +9,7 @@ import {
   EnvironmentOutlined, HeartOutlined, UserOutlined, FilterOutlined,
   AppstoreOutlined, UnorderedListOutlined, EnvironmentFilled, HomeFilled,
   DownOutlined, CameraFilled, CheckOutlined,
-  RightOutlined, SearchOutlined,AimOutlined 
+  RightOutlined, SearchOutlined, AimOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -49,6 +49,8 @@ const FURNITURE_OPTIONS = ['Nội thất cao cấp', 'Nội thất đầy đủ'
 // ==============================================================================
 const NearbyAmenitiesContent = ({ onClose, onApply }) => {
   const [keyword, setKeyword] = useState('');
+  const [totalElements, setTotalElements] = useState(0);
+
   const [suggestions, setSuggestions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [radius, setRadius] = useState(2000); // Mặc định 2km
@@ -242,10 +244,15 @@ const TypeSelectContent = ({ currentType, onClose, onApply }) => {
 };
 
 const FilterPage = () => {
+
   const location = useLocation();
   const navigate = useNavigate();
-  // Sử dụng useSearchParams để đọc/ghi URL
   const [searchParams, setSearchParams] = useSearchParams();
+
+  const [totalElements, setTotalElements] = useState(0);
+  const [messageApi, contextHolder] = message.useMessage();
+
+
 
   // State khởi tạo từ trang trước hoặc URL
   const getInitialFilters = () => {
@@ -273,7 +280,6 @@ const FilterPage = () => {
   // State quản lý dữ liệu
   const [loading, setLoading] = useState(false);
   const [rooms, setRooms] = useState([]);
-  const [paginatedRooms, setPaginatedRooms] = useState([]);
   const [topLandlords, setTopLandlords] = useState([]);
 
   const [viewMode, setViewMode] = useState('list');
@@ -304,7 +310,7 @@ const FilterPage = () => {
   // --- GỌI API LẤY PHÒNG ---
   useEffect(() => {
     fetchRooms();
-  }, [filters.locationCoords, filters.type, filters.keyword, priceRange, selectedBedrooms, selectedBathrooms, areaRange, selectedDirection, selectedFurniture]);
+  }, [currentPage, filters.locationCoords, filters.type, filters.keyword, priceRange, selectedBedrooms, selectedBathrooms, areaRange, selectedDirection, selectedFurniture]);
 
   // --- GỌI API LẤY CHỦ TRỌ NỔI BẬT ---
   useEffect(() => {
@@ -324,14 +330,6 @@ const FilterPage = () => {
     fetchTopLandlords();
   }, [filters.locationCoords]);
 
-  // Xử lý phân trang Client-side
-  useEffect(() => {
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    setPaginatedRooms(rooms.slice(startIndex, endIndex));
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }, [rooms, currentPage, pageSize]);
-
   const fetchRooms = async () => {
     setLoading(true);
     try {
@@ -339,36 +337,34 @@ const FilterPage = () => {
         lat: filters.locationCoords.lat,
         lng: filters.locationCoords.lng,
         radius: filters.radius || 20000,
-        keyword: filters.keyword, // Gửi từ khóa xuống để Backend lưu lịch sử
-        type: filters.type        // Gửi loại phòng (Nguyên căn/Ở ghép) để lọc
+        keyword: filters.keyword,
+        type: filters.type,
+        // Gửi trang hiện tại (Backend tính từ 0)
+        page: currentPage - 1,
+        size: pageSize
       });
 
-      let data = res.data || [];
-
-      // Logic lọc Client-side
-      if (filters.type !== 'ALL') data = data.filter(r => r.rentalType === filters.type);
-      data = data.filter(r => r.price >= priceRange[0] && r.price <= priceRange[1]);
-      if (areaRange.min) data = data.filter(r => r.area >= areaRange.min);
-      if (areaRange.max) data = data.filter(r => r.area <= areaRange.max);
-      if (selectedBedrooms.length > 0) data = data.filter(r => selectedBedrooms.includes(r.capacity));
-
-      if (filters.keyword) {
-        const k = filters.keyword.toLowerCase();
-        data = data.filter(r => r.title.toLowerCase().includes(k) || r.address.toLowerCase().includes(k));
-      }
+      // 🟢 SỬA TẠI ĐÂY: Lấy content từ Page object
+      let data = res.data.content || [];
+      setTotalElements(res.data.totalElements || 0); // Cập nhật tổng số để hiện thanh số trang
 
       const mappedData = data.map(r => ({
+
         ...r,
+
         images: (r.images && r.images.length > 0) ? r.images : ['https://via.placeholder.com/300x200?text=No+Image'],
+
         time: r.approvedAt ? dayjs(r.approvedAt).fromNow() : (r.createdAt ? dayjs(r.createdAt).fromNow() : 'Vừa xong'),
+
         isPro: r.servicePackageId && r.servicePackageId > 1
+
       }));
 
-      setRooms(mappedData);
-      setCurrentPage(1);
+      setRooms(mappedData); // Cập nhật trực tiếp vào state rooms
+      window.scrollTo({ top: 0, behavior: 'smooth' }); // Cuộn lên đầu trang sau khi chuyển số
     } catch (error) {
       console.error(error);
-      message.error("Lỗi tải dữ liệu phòng");
+      messageApi.error("Lỗi tải dữ liệu"); // Dùng messageApi mới fix lỗi Warning
     } finally {
       setLoading(false);
     }
@@ -514,7 +510,7 @@ const FilterPage = () => {
   // --- RENDER DẠNG DANH SÁCH (LIST VIEW) ---
   const renderListView = () => (
     <div className="flex flex-col gap-3">
-      {paginatedRooms.map(room => (
+      {rooms.map(room => (
         <Card key={room.id} hoverable className="overflow-hidden border border-gray-200 shadow-none hover:shadow-md transition-all rounded-md bg-white" bodyStyle={{ padding: 0 }} onClick={() => navigate(`/rooms/${room.id}`)}>
           <div className="flex flex-col sm:flex-row h-full">
             <div className="w-full sm:w-[260px] h-[170px] relative flex-shrink-0">
@@ -551,7 +547,7 @@ const FilterPage = () => {
   // --- RENDER DẠNG LƯỚI (GRID VIEW) ---
   const renderGridView = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {paginatedRooms.map(room => (
+      {rooms.map(room => (
         <Card key={room.id} hoverable className="overflow-hidden border border-gray-200 shadow-none hover:shadow-md transition-all rounded-md bg-white flex flex-col h-full" bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
           cover={
             <div className="relative h-48 w-full">
@@ -584,6 +580,7 @@ const FilterPage = () => {
 
   return (
     <ConfigProvider theme={{ token: { colorPrimary: '#f96302', borderRadius: 4, fontFamily: 'Arial, sans-serif' } }}>
+      {contextHolder}
       <div className="min-h-screen bg-[#f4f4f4] pb-10 font-sans">
 
         {/* HEADER FILTERS */}
@@ -712,13 +709,15 @@ const FilterPage = () => {
                 rooms.length === 0 ? <Empty description="Không có tin đăng nào phù hợp" className="py-10 bg-white rounded" /> :
                   (
                     <>
-                      {viewMode === 'list' ? renderListView() : renderGridView()}
+                      
+                      {viewMode === 'list' ? renderListView(rooms) : renderGridView(rooms)}
 
                       {/* --- THANH PHÂN TRANG --- */}
                       <div className="flex justify-center mt-6">
+
                         <Pagination
                           current={currentPage}
-                          total={rooms.length}
+                          total={totalElements}
                           pageSize={pageSize}
                           onChange={(page) => setCurrentPage(page)}
                           showSizeChanger={false}

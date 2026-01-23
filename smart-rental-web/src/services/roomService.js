@@ -46,11 +46,12 @@ const roomService = {
         lat: filter.lat,
         lng: filter.lng,
         radius: filter.radius || 50000,
-        
-        keyword: filter.keyword, 
+        type: filter.type,
+        keyword: filter.keyword,
+        page: filter.page,
+        size: filter.size,
 
-        // Bổ sung thêm type để lọc (nếu backend hỗ trợ)
-        type: filter.type 
+
       }
     });
   },
@@ -65,6 +66,10 @@ const roomService = {
   // Trang profile chủ trọ
   getRoomsByLandlord: (landlordId) => {
     return axiosClient.get(`/rooms/landlord/${landlordId}`);
+  },
+  // Giá khu vực
+  getPriceHistory: (id) => {
+    return axiosClient.get(`/rooms/${id}/price-history`);
   }
 };
 

@@ -91,6 +91,10 @@ const HomePage = () => {
 
   // State Dữ liệu chính
   const [rooms, setRooms] = useState([]);
+  const [page, setPage] = useState(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+  const pageSize = 8;
   const [loading, setLoading] = useState(false);
 
   // State Tin Mới Đăng
@@ -128,7 +132,6 @@ const HomePage = () => {
 
       if (token) {
         const res = await searchHistoryService.getMyHistory();
-        console.log("🔥 Dữ liệu lịch sử tải về:", res.data);
         setHistoryList(res.data);
       }
     } catch (error) {
@@ -162,11 +165,17 @@ const HomePage = () => {
     // 👇 Chuyển hướng ngay lập tức
     navigate('/filter', { state: searchParams });
   };
-  // --- API 1: TÌM KIẾM CHÍNH ---
-  const fetchRooms = async (overrideParams = {}) => {
-    setLoading(true); setRooms([]);
-    const currentParams = { ...filtersRef.current, ...overrideParams };
 
+  // --- API 1: TÌM KIẾM CHÍNH (CẬP NHẬT NGẮT Ở 12 TIN) ---
+  const fetchRooms = async (isLoadMore = false) => {
+    setLoading(true);
+    if (!isLoadMore) {
+      setRooms([]);
+      setPage(0);
+    }
+
+    const nextPage = isLoadMore ? page + 1 : 0;
+    const currentParams = filtersRef.current;
 
     try {
       const res = await roomService.searchRooms({
@@ -174,57 +183,61 @@ const HomePage = () => {
         lng: currentParams.locationCoords.lng,
         radius: currentParams.radius,
         keyword: currentParams.keyword,
-        type: currentParams.type
+        type: currentParams.type,
+        page: nextPage,
+        size: isLoadMore ? 4 : 8
       });
 
-      if (currentParams.keyword && currentParams.keyword.trim() !== '') {
-        fetchHistory();
-      }
-      let data = res.data || [];
+      if (currentParams.keyword?.trim()) fetchHistory();
 
-      if (currentParams.type !== 'ALL') data = data.filter(r => r.rentalType === currentParams.type);
-      setRooms(data);
+
+      const newData = res.data.content || [];
+
+      setRooms(prev => isLoadMore ? [...prev, ...newData] : newData);
+      setPage(nextPage);
+      setHasMore(newData.length === (isLoadMore ? 4 : 8));
+
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
+      setIsInitialLoad(false);
     }
   };
 
   // --- API 2: TIN MỚI ĐĂNG ---
   const fetchNewListings = async () => {
     try {
-      const res = await roomService.searchRooms({ lat: 16.0, lng: 108.0, radius: 2000000 });
-      const allRooms = res.data || [];
-      const sorted = allRooms.sort((a, b) => b.id - a.id);
+      const res = await roomService.searchRooms({ lat: 16.0, lng: 108.0, radius: 2000000, size: 10 });
+
+      // 🟢 SỬA TẠI ĐÂY: Lấy content
+      const allRooms = res.data.content || [];
+
+      const sorted = [...allRooms].sort((a, b) => b.id - a.id);
       setNewListings(sorted.slice(0, 10));
-    } catch (error) { console.error(error); } finally { setLoadingNew(false); }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setLoadingNew(false);
+    }
   };
 
   // --- API 3: ĐẾM SỐ LƯỢNG (UPDATE LOGIC) ---
   const fetchLocationCounts = async (typeFilter) => {
-    // Clone mảng config để cập nhật số lượng
     const updatedStats = [...LOCATION_CONFIG];
 
-    // Dùng Promise.all để gọi song song cho 5 thành phố
     await Promise.all(updatedStats.map(async (loc) => {
       try {
-        // Gọi API tìm kiếm theo bán kính 20km
         const res = await roomService.searchRooms({
           lat: loc.lat,
           lng: loc.lng,
-          radius: 20000
+          radius: 20000,
+          size: 1, // Chỉ lấy 1 tin để lấy được totalElements
+          type: typeFilter !== 'ALL' ? typeFilter : undefined
         });
 
-        let data = res.data || [];
-
-        // QUAN TRỌNG: Lọc theo loại hình nếu không phải là ALL
-        if (typeFilter !== 'ALL') {
-          data = data.filter(r => r.rentalType === typeFilter);
-        }
-
-        // Gán số lượng đã lọc vào biến count
-        loc.count = data.length;
+        // 🟢 SỬA TẠI ĐÂY: Dùng totalElements từ Backend trả về
+        loc.count = res.data.totalElements || 0; 
       } catch (e) {
         loc.count = 0;
       }
@@ -263,7 +276,7 @@ const HomePage = () => {
         const newCoords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
         setFilters(prev => ({ ...prev, locationName: locData.displayName, locationCoords: newCoords, radius: 10000 }));
         message.success({ content: `Đã chọn vị trí: ${locData.displayName}`, key: 'geo' });
-        // fetchRooms({ locationCoords: newCoords, radius: 10000 }); // Xoá dòng này nếu muốn bấm Tìm mới chạy
+
       } else { message.warning({ content: 'Không tìm thấy tọa độ!', key: 'geo' }); }
     } catch (e) { message.error({ content: 'Lỗi bản đồ', key: 'geo' }); }
   };
@@ -361,25 +374,25 @@ const HomePage = () => {
                 onClick={(e) => { e.stopPropagation(); setShowHistory(true); }}
               />
 
-       
+
               {/* --- PHẦN DROPDOWN LỊCH SỬ (PHIÊN BẢN THU NHỎ) --- */}
               {showHistory && historyList.length > 0 && (
-                <div 
+                <div
                   // Giảm bo góc xuống rounded-xl và giảm shadow cho nhẹ nhàng
-                  className="absolute top-[105%] left-0 w-full bg-white rounded-xl shadow-xl z-[100] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200" 
+                  className="absolute top-[105%] left-0 w-full bg-white rounded-xl shadow-xl z-[100] border border-gray-100 overflow-hidden animate-in fade-in slide-in-from-top-1 duration-200"
                   onMouseDown={(e) => e.preventDefault()}
                 >
                   {/* Tiêu đề: Giảm padding và cỡ chữ */}
                   <div className="px-4 py-2.5 border-b border-gray-50 flex justify-between items-center bg-gray-50/50">
                     <span className="text-sm font-semibold text-gray-600">Tiếp tục tìm kiếm</span>
-                    <Button 
-                      type="text" 
-                      size="small" 
+                    <Button
+                      type="text"
+                      size="small"
                       className="text-gray-400 hover:text-red-500 text-[11px]"
-                      onClick={async (e) => { 
+                      onClick={async (e) => {
                         e.stopPropagation();
-                        await searchHistoryService.clearAllHistory(); 
-                        setHistoryList([]); 
+                        await searchHistoryService.clearAllHistory();
+                        setHistoryList([]);
                       }}
                     >
                       Xóa tất cả
@@ -398,7 +411,7 @@ const HomePage = () => {
                         <div className="flex items-center gap-3 flex-grow overflow-hidden">
                           {/* Icon: Giảm từ w-10 xuống w-8 */}
                           <div className="w-8 h-8 bg-red-50 rounded-full flex items-center justify-center flex-shrink-0">
-                             <HistoryOutlined className="text-red-400 text-sm" /> 
+                            <HistoryOutlined className="text-red-400 text-sm" />
                           </div>
 
                           <div className="flex flex-col truncate">
@@ -406,31 +419,31 @@ const HomePage = () => {
                             <span className="text-sm text-gray-700 font-medium group-hover:text-[#f96302] truncate">
                               {item.queryText || item.address || "Tìm kiếm trước đó"}
                             </span>
-                            
+
                             {/* Chữ phụ: nhỏ hơn (text-[11px]) */}
                             {item.address && item.address !== item.queryText && (
-                               <span className="text-[11px] text-gray-400 truncate opacity-80">
-                                 {item.address}
-                               </span>
+                              <span className="text-[11px] text-gray-400 truncate opacity-80">
+                                {item.address}
+                              </span>
                             )}
                           </div>
                         </div>
-                        
+
                         <div className="flex items-center gap-2">
-                           {/* Mũi tên nhỏ lại */}
-                           <RightOutlined className="text-gray-300 text-[10px] group-hover:text-[#f96302] group-hover:translate-x-0.5 transition-all" />
-                           
-                           <Button
-                             type="text"
-                             icon={<CloseOutlined className="text-[9px]" />}
-                             size="small"
-                             // Thu nhỏ nút xóa
-                             className="text-gray-300 hover:text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center"
-                             onClick={(e) => {
-                               e.stopPropagation();
-                               handleDeleteHistory(e, item.id);
-                             }}
-                           />
+                          {/* Mũi tên nhỏ lại */}
+                          <RightOutlined className="text-gray-300 text-[10px] group-hover:text-[#f96302] group-hover:translate-x-0.5 transition-all" />
+
+                          <Button
+                            type="text"
+                            icon={<CloseOutlined className="text-[9px]" />}
+                            size="small"
+                            // Thu nhỏ nút xóa
+                            className="text-gray-300 hover:text-red-500 rounded-full opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6 flex items-center justify-center"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteHistory(e, item.id);
+                            }}
+                          />
                         </div>
                       </div>
                     ))}
@@ -551,30 +564,79 @@ const HomePage = () => {
             </div>
           </div>
 
-          {/* SECTION 3: DANH SÁCH CHÍNH (Vẫn giữ nguyên để hiển thị mặc định) */}
-          <div>
+
+
+          {/* SECTION 3: DANH SÁCH CHÍNH */}
+          <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
-              <Title level={4}>Tin dành cho bạn tại {filters.locationName}</Title>
+              <Title level={4}>Tin dành cho bạn</Title>
               <Button icon={<AimOutlined />} onClick={() => navigate('/search')}>Xem trên bản đồ</Button>
             </div>
-            {loading ? <div className="text-center py-20"><Spin size="large" /></div> : rooms.length === 0 ? <Empty description="Không tìm thấy tin đăng nào" className="py-10" /> : (
-              <Row gutter={[16, 16]}>
-                {rooms.map(room => (
-                  <Col xs={24} sm={12} md={8} lg={6} key={room.id}>
-                    <Card
-                      hoverable
-                      className="rounded-lg overflow-hidden border border-gray-200 shadow-none hover:shadow-lg transition-all h-full flex flex-col"
-                      bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
-                      cover={<div className="relative h-48 overflow-hidden"><img alt={room.title} src={room.images?.[0] || 'https://via.placeholder.com/400'} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" /><Tag color="#f96302" className="absolute top-2 left-2 border-none font-semibold text-xs">{room.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Ở ghép'}</Tag></div>}
-                      onClick={() => navigate(`/rooms/${room.id}`)}
+
+            {loading && isInitialLoad ? (
+              <div className="text-center py-20"><Spin size="large" /></div>
+            ) : rooms.length === 0 ? (
+              <Empty description="Không tìm thấy tin đăng nào" className="py-10" />
+            ) : (
+              <>
+                <Row gutter={[16, 16]}>
+                  {rooms.map(room => (
+                    <Col xs={24} sm={12} md={8} lg={6} key={room.id}>
+                      <Card
+                        hoverable
+                        className="rounded-lg overflow-hidden border border-gray-200 shadow-none hover:shadow-lg transition-all h-full flex flex-col"
+                        bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
+                        cover={
+                          <div className="relative h-48 overflow-hidden">
+                            <img
+                              alt={room.title}
+                              src={room.images?.[0] || 'https://via.placeholder.com/400'}
+                              className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
+                              loading="lazy"
+                            />
+                            <Tag color="#f96302" className="absolute top-2 left-2 border-none font-semibold text-xs">
+                              {room.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Ở ghép'}
+                            </Tag>
+                          </div>
+                        }
+                        onClick={() => navigate(`/rooms/${room.id}`)}
+                      >
+                        <h3 className="font-bold text-sm text-gray-800 mb-1 line-clamp-2 h-10" title={room.title}>{room.title}</h3>
+                        <div className="text-xs text-gray-500 mb-2 truncate"><EnvironmentFilled className="mr-1 text-gray-400" />{room.address}</div>
+                        <div className="mt-auto pt-2 border-t border-dashed border-gray-200 flex justify-between items-end">
+                          <span className="text-[#f96302] font-bold text-base">{formatCurrency(room.price)}/tháng</span>
+                          <span className="text-xs text-gray-400">{room.area} m²</span>
+                        </div>
+                      </Card>
+                    </Col>
+                  ))}
+                </Row>
+
+                {/* --- NÚT ĐIỀU KHIỂN NẰM GIỮA --- */}
+                <div className="mt-12 flex justify-center pb-10">
+                  {hasMore && rooms.length < 16 ? (
+                    // Nút Mở rộng (Load thêm 8 tin để thành 16)
+                    <Button
+                      size="large"
+                      className="px-12 h-12 font-semibold border-[#f96302] text-[#f96302] hover:bg-orange-50 rounded-md"
+                      onClick={() => fetchRooms(true)}
+                      loading={loading}
                     >
-                      <h3 className="font-bold text-sm text-gray-800 mb-1 line-clamp-2 h-10" title={room.title}>{room.title}</h3>
-                      <div className="text-xs text-gray-500 mb-2 truncate"><EnvironmentFilled className="mr-1 text-gray-400" />{room.address}</div>
-                      <div className="mt-auto pt-2 border-t border-dashed border-gray-200 flex justify-between items-end"><span className="text-[#f96302] font-bold text-base">{formatCurrency(room.price)}/tháng</span><span className="text-xs text-gray-400">{room.area} m²</span></div>
-                    </Card>
-                  </Col>
-                ))}
-              </Row>
+                      Mở rộng thêm tin
+                    </Button>
+                  ) : (rooms.length >= 16 || (!hasMore && rooms.length > 0)) ? (
+                    // Nút Xem tất cả (Chuyển sang trang filter)
+                    <Button
+                      type="primary"
+                      size="large"
+                      className="px-12 h-12 font-bold bg-[#f96302] rounded-md shadow-md"
+                      onClick={() => navigate('/filter', { state: filters })}
+                    >
+                      Xem tất cả kết quả <RightOutlined />
+                    </Button>
+                  ) : null}
+                </div>
+              </>
             )}
           </div>
 
