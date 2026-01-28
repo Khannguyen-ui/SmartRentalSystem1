@@ -7,7 +7,7 @@ import {
   SearchOutlined, EnvironmentFilled, HomeFilled, CheckOutlined,
   AimOutlined, DownOutlined, HeartOutlined, PictureOutlined, RightOutlined,
   HistoryOutlined,
-  CloseOutlined
+  CloseOutlined, CrownFilled, FireFilled
 } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -19,50 +19,16 @@ const { Option } = Select;
 const { Title } = Typography;
 
 // --- CẤU HÌNH DANH SÁCH TỈNH THÀNH ---
+
+// --- CẤU HÌNH DANH SÁCH TỈNH THÀNH (FIXED LINKS) ---
 const LOCATION_CONFIG = [
-  { id: 1, name: 'Tp Hồ Chí Minh', lat: 10.7769, lng: 106.7009, img: 'https://images.unsplash.com/photo-1583417319070-4a69db38a482?q=80&w=1000&auto=format&fit=crop', colSpan: 2, rowSpan: 2 },
-  { id: 2, name: 'Hà Nội', lat: 21.0285, lng: 105.8542, img: 'https://images.unsplash.com/photo-1555921015-5532091f6026?q=80&w=1000&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-  { id: 3, name: 'Đà Nẵng', lat: 16.0544, lng: 108.2022, img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?q=80&w=1000&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-  { id: 4, name: 'Cần Thơ', lat: 10.0452, lng: 105.7469, img: 'https://images.unsplash.com/photo-1623950137785-334338d9dc2c?q=80&w=1000&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
-  { id: 5, name: 'Bình Dương', lat: 10.9804, lng: 106.6519, img: 'https://images.unsplash.com/photo-1605834571992-693db474a896?q=80&w=1000&auto=format&fit=crop', colSpan: 1, rowSpan: 1 },
+  { id: 1, name: 'Tp Hồ Chí Minh', lat: 10.7769, lng: 106.7009, img: 'https://images.unsplash.com/photo-1583417319070-4a69db38a482?auto=format&fit=crop&w=1000&q=80', colSpan: 2, rowSpan: 2 },
+  { id: 2, name: 'Hà Nội', lat: 21.0285, lng: 105.8542, img: 'https://images.unsplash.com/photo-1555921015-5532091f6026?auto=format&fit=crop&w=1000&q=80', colSpan: 1, rowSpan: 1 },
+  { id: 3, name: 'Đà Nẵng', lat: 16.0544, lng: 108.2022, img: 'https://images.unsplash.com/photo-1559592413-7cec4d0cae2b?auto=format&fit=crop&w=1000&q=80', colSpan: 1, rowSpan: 1 },
+  { id: 4, name: 'Bình Dương', lat: 10.9804, lng: 106.6519, img: 'https://images.unsplash.com/photo-1596422846543-75c6fc197f07?auto=format&fit=crop&w=1000&q=80', colSpan: 1, rowSpan: 1 },
 ];
 
-// --- POPOVER KHU VỰC ---
-const LocationSelectContent = ({ onClose, onApply }) => {
-  const [provinces, setProvinces] = useState([]);
-  const [districts, setDistricts] = useState([]);
-  const [wards, setWards] = useState([]);
-  const [tempProv, setTempProv] = useState(null);
-  const [tempDist, setTempDist] = useState(null);
-  const [tempWard, setTempWard] = useState(null);
 
-  useEffect(() => { axios.get('https://provinces.open-api.vn/api/?depth=1').then(res => setProvinces(res.data)); }, []);
-
-  const handleProvChange = async (val, opt) => {
-    setTempProv({ code: val, name: opt.children }); setTempDist(null); setTempWard(null);
-    const res = await axios.get(`https://provinces.open-api.vn/api/p/${val}?depth=2`); setDistricts(res.data.districts);
-  };
-  const handleDistChange = async (val, opt) => {
-    setTempDist({ code: val, name: opt.children }); setTempWard(null);
-    const res = await axios.get(`https://provinces.open-api.vn/api/d/${val}?depth=2`); setWards(res.data.wards);
-  };
-  const handleApply = () => {
-    const fullText = [tempWard?.name, tempDist?.name, tempProv?.name].filter(Boolean).join(', ');
-    onApply({ province: tempProv, district: tempDist, ward: tempWard, fullText, displayName: fullText || "Toàn quốc" }); onClose();
-  };
-
-  return (
-    <div className="w-[320px] p-1">
-      <h4 className="font-bold mb-3 text-center text-gray-700">Chọn khu vực tìm kiếm</h4>
-      <div className="flex flex-col gap-3">
-        <Select showSearch placeholder="Tỉnh/Thành" className="w-full" onChange={handleProvChange} optionFilterProp="children">{provinces.map(p => <Option key={p.code} value={p.code}>{p.name}</Option>)}</Select>
-        <Select showSearch placeholder="Quận/Huyện" className="w-full" onChange={handleDistChange} disabled={!tempProv} value={tempDist?.code} optionFilterProp="children">{districts.map(d => <Option key={d.code} value={d.code}>{d.name}</Option>)}</Select>
-        <Select showSearch placeholder="Phường/Xã" className="w-full" onChange={(val, opt) => setTempWard({ code: val, name: opt.children })} disabled={!tempDist} value={tempWard?.code} optionFilterProp="children">{wards.map(w => <Option key={w.code} value={w.code}>{w.name}</Option>)}</Select>
-        <Button type="primary" className="mt-2 font-bold h-10 w-full rounded-md" onClick={handleApply}>Áp dụng</Button>
-      </div>
-    </div>
-  );
-};
 
 // --- POPOVER LOẠI HÌNH ---
 const TypeSelectContent = ({ currentType, onClose, onApply }) => {
@@ -112,6 +78,33 @@ const HomePage = () => {
   const [filters, setFilters] = useState({ keyword: '', type: 'ALL', locationName: 'Toàn quốc', locationCoords: { lat: 10.7769, lng: 106.7009 }, radius: 20000 });
   const filtersRef = useRef(filters);
   useEffect(() => { filtersRef.current = filters; }, [filters]);
+  //Reaload Post
+  // Hàm này giúp tải lại tin ngay lập tức với dữ liệu lọc mới nhất
+  const fetchRoomsWithParams = async (newParams) => {
+    setLoading(true);
+    setPage(0);
+    setRooms([]);
+
+    try {
+      const res = await roomService.searchRooms({
+        lat: newParams.locationCoords.lat,
+        lng: newParams.locationCoords.lng,
+        radius: newParams.radius || 15000,
+        keyword: newParams.keyword || '',
+        type: newParams.type || 'ALL',
+        page: 0,
+        size: 8
+      });
+
+      setRooms(res.data.content || []);
+      setHasMore(res.data.content?.length === 8);
+    } catch (error) {
+      console.error("Lỗi tải tin:", error);
+    } finally {
+      setLoading(false);
+      setIsInitialLoad(false);
+    }
+  };
 
   // --- STATE LỊCH SỬ TÌM KIẾM ---
   const [historyList, setHistoryList] = useState([]);
@@ -165,122 +158,219 @@ const HomePage = () => {
     // 👇 Chuyển hướng ngay lập tức
     navigate('/filter', { state: searchParams });
   };
+  const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // Bán kính trái đất (mét)
+    const dLat = (lat2 - lat1) * Math.PI / 180;
+    const dLon = (lon2 - lon1) * Math.PI / 180;
+    const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    return R * c;
+  };
 
   // --- API 1: TÌM KIẾM CHÍNH (CẬP NHẬT NGẮT Ở 12 TIN) ---
-  const fetchRooms = async (isLoadMore = false) => {
+
+  const fetchRooms = async (isLoadMore = false, overrideFilters = null) => {
     setLoading(true);
-    if (!isLoadMore) {
-      setRooms([]);
-      setPage(0);
-    }
+    if (!isLoadMore) { setRooms([]); setPage(0); }
 
     const nextPage = isLoadMore ? page + 1 : 0;
-    const currentParams = filtersRef.current;
+    const currentParams = overrideFilters || filters;
 
     try {
       const res = await roomService.searchRooms({
         lat: currentParams.locationCoords.lat,
         lng: currentParams.locationCoords.lng,
-        radius: currentParams.radius,
-        keyword: currentParams.keyword,
+        radius: currentParams.radius || 20000,
         type: currentParams.type,
+        keyword: currentParams.keyword,
         page: nextPage,
-        size: isLoadMore ? 4 : 8
+        size: 8
       });
-
-      if (currentParams.keyword?.trim()) fetchHistory();
-
 
       const newData = res.data.content || [];
 
-      setRooms(prev => isLoadMore ? [...prev, ...newData] : newData);
-      setPage(nextPage);
-      setHasMore(newData.length === (isLoadMore ? 4 : 8));
+      // 🟢 BỔ SUNG LOGIC SẮP XẾP CLIENT-SIDE (Đồng bộ với Tin Mới)
+      const sortedData = [...newData].sort((a, b) => {
+        const priorityA = a.priorityLevel || 0;
+        const priorityB = b.priorityLevel || 0;
 
+        // Ưu tiên 1: VIP (Priority Level)
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA;
+        }
+        // Ưu tiên 2: Tin mới đẩy/mới tạo
+        const dateA = new Date(a.lastPushedAt || a.createdAt);
+        const dateB = new Date(b.lastPushedAt || b.createdAt);
+        return dateB - dateA;
+      });
+
+      setRooms(prev => isLoadMore ? [...prev, ...sortedData] : sortedData);
+      setPage(nextPage);
+      setHasMore(newData.length === 8);
     } catch (error) {
-      console.error(error);
+      console.error("Lỗi fetchRooms:", error);
     } finally {
       setLoading(false);
       setIsInitialLoad(false);
     }
   };
+  // Tự động load lại tin khi có bất kỳ thay đổi nào từ bộ lọc chính
+  useEffect(() => {
+    if (!isInitialLoad) {
+      fetchRooms();
+      fetchNewListings();
+    }
+  }, [filters.locationCoords, filters.type]);
+  // --- 🟢 SỬA LẠI: TIN MỚI ĐĂNG (Dùng tọa độ thực tế) ---
+  // --- 🟢 API 2: TIN MỚI ĐĂNG (ƯU TIÊN VIP + MỚI NHẤT) ---
+  const fetchNewListings = async (overrideFilters = null) => {
+    setLoadingNew(true);
+    const currentParams = overrideFilters || filters;
 
-  // --- API 2: TIN MỚI ĐĂNG ---
-  const fetchNewListings = async () => {
     try {
-      const res = await roomService.searchRooms({ lat: 16.0, lng: 108.0, radius: 2000000, size: 10 });
+      // 1. Lấy số lượng lớn (size=20) để đảm bảo lấy đủ các tin VIP và tin mới
+      const res = await roomService.searchRooms({
+        lat: currentParams.locationCoords.lat,
+        lng: currentParams.locationCoords.lng,
+        radius: 20000,
+        size: 20
+      });
 
-      // 🟢 SỬA TẠI ĐÂY: Lấy content
       const allRooms = res.data.content || [];
 
-      const sorted = [...allRooms].sort((a, b) => b.id - a.id);
-      setNewListings(sorted.slice(0, 10));
+      // 2. 🟢 LOGIC SẮP XẾP MỚI: VIP TRƯỚC -> NGÀY MỚI SAU
+      const sortedList = allRooms.sort((a, b) => {
+        // Lấy độ ưu tiên, nếu null/undefined thì coi là 0 (Tin thường)
+        const priorityA = a.priorityLevel || 0;
+        const priorityB = b.priorityLevel || 0;
+
+        // Bước 1: So sánh độ ưu tiên
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA; // Priority lớn hơn (VIP cao hơn) xếp trước
+        }
+
+        // Bước 2: Nếu cùng độ ưu tiên (cùng là VIP hoặc cùng là thường) -> So sánh ngày tạo
+        return new Date(b.createdAt) - new Date(a.createdAt); // Ngày mới hơn xếp trước
+      });
+
+      // 3. Cắt lấy 10 tin đầu tiên sau khi sắp xếp
+      setNewListings(sortedList.slice(0, 10));
+
     } catch (error) {
-      console.error(error);
+      console.error("Lỗi fetch tin mới:", error);
     } finally {
       setLoadingNew(false);
     }
   };
 
-  // --- API 3: ĐẾM SỐ LƯỢNG (UPDATE LOGIC) ---
+
+  // --- API 3: ĐẾM SỐ LƯỢNG (SỬA LỖI ĐẾM SAI) ---
   const fetchLocationCounts = async (typeFilter) => {
-    const updatedStats = [...LOCATION_CONFIG];
+    try {
+      // 1. Lấy danh sách tin (Giữ nguyên tọa độ mồi để tránh lỗi 400 Backend)
+      const res = await roomService.searchRooms({
+        size: 1000,
+        lat: 10.7769, lng: 106.7009, radius: 5000000
+      });
 
-    await Promise.all(updatedStats.map(async (loc) => {
-      try {
-        const res = await roomService.searchRooms({
-          lat: loc.lat,
-          lng: loc.lng,
-          radius: 20000,
-          size: 1, // Chỉ lấy 1 tin để lấy được totalElements
-          type: typeFilter !== 'ALL' ? typeFilter : undefined
-        });
+      let allRooms = res.data.content || [];
 
-        // 🟢 SỬA TẠI ĐÂY: Dùng totalElements từ Backend trả về
-        loc.count = res.data.totalElements || 0; 
-      } catch (e) {
-        loc.count = 0;
+      // 2. LỌC THEO LOẠI HÌNH TRƯỚC (Nếu không phải 'ALL')
+      if (typeFilter && typeFilter !== 'ALL') {
+        allRooms = allRooms.filter(room => room.rentalType === typeFilter);
       }
-    }));
 
-    setLocationStats(updatedStats);
+      // 3. Sau đó mới đếm theo từng khu vực
+      const updatedStats = LOCATION_CONFIG.map(loc => {
+        const countInArea = allRooms.filter(room => {
+          const rLat = room.latitude || room.lat;
+          const rLng = room.longitude || room.lng;
+          if (!rLat || !rLng) return false;
+
+          const distance = getDistance(loc.lat, loc.lng, rLat, rLng);
+          return distance <= 15000;
+        }).length;
+
+        return { ...loc, count: countInArea };
+      });
+
+      setLocationStats(updatedStats);
+    } catch (error) {
+      console.error("Lỗi cập nhật số lượng tin theo Tab:", error);
+    }
   };
-
-  // --- XỬ LÝ KHI CHUYỂN TAB ---
   const handleTabChange = (key) => {
     let type = 'ALL';
-    if (key === '2') type = 'WHOLE';  // Map key='2' với Nhà nguyên căn
-    if (key === '3') type = 'SHARED'; // Map key='3' với Ký túc xá
+    if (key === '2') type = 'WHOLE';
+    if (key === '3') type = 'SHARED';
 
     setActiveTabType(type);
 
-    // Gọi hàm đếm lại với loại hình mới
-    fetchLocationCounts(type);
-  };
+    // 1. Tạo object filter mới để truyền trực tiếp
+    const updatedFilters = { ...filters, type: type };
 
+    // 2. Cập nhật state (để hiển thị UI)
+    setFilters(updatedFilters);
+
+    // 3. 🟢 GỌI LẠI CÁC HÀM CẬP NHẬT DỮ LIỆU
+    fetchRooms(false, updatedFilters); // Load lại danh sách Tin dành cho bạn
+    fetchNewListings(updatedFilters);  // Load lại danh sách Tin mới
+    fetchLocationCounts(type);         // Đếm lại số lượng trên ảnh thành phố
+  };
   const handleApplyLocation = async (locData) => {
-    if (!locData.fullText) {
-      const defaultCoords = { lat: 10.7769, lng: 106.7009 };
-      setFilters(prev => ({ ...prev, locationName: "Toàn quốc", locationCoords: defaultCoords, radius: 5000000 }));
-      fetchRooms({ locationCoords: defaultCoords, radius: 5000000 });
-      return;
-    }
-    message.loading({ content: `Đang tìm vị trí...`, key: 'geo' });
+    if (!locData.fullText) return;
+    const hide = message.loading(`Đang cập nhật tin tại ${locData.displayName}...`, 0);
     try {
       const geocode = async (q) => (await axios.get(`https://nominatim.openstreetmap.org/search`, { params: { q, format: 'json', limit: 1, countrycodes: 'vn' } })).data?.[0];
       let result = await geocode(locData.fullText);
-      if (!result && locData.district) result = await geocode(`${locData.district.name}, ${locData.province.name}`);
-      if (!result && locData.province) result = await geocode(locData.province.name);
 
       if (result) {
         const newCoords = { lat: parseFloat(result.lat), lng: parseFloat(result.lon) };
-        setFilters(prev => ({ ...prev, locationName: locData.displayName, locationCoords: newCoords, radius: 10000 }));
-        message.success({ content: `Đã chọn vị trí: ${locData.displayName}`, key: 'geo' });
+        const newFilters = {
+          ...filters,
+          locationName: locData.displayName,
+          locationCoords: newCoords,
+          radius: 20000
+        };
 
-      } else { message.warning({ content: 'Không tìm thấy tọa độ!', key: 'geo' }); }
-    } catch (e) { message.error({ content: 'Lỗi bản đồ', key: 'geo' }); }
+        setFilters(newFilters); // Cập nhật tên hiển thị trên thanh Search
+
+        // 🟢 RA LỆNH CẬP NHẬT TẤT CẢ DANH SÁCH TIN
+        fetchRooms(false, newFilters);
+        fetchNewListings(newFilters);
+        fetchLocationCounts(newFilters.type);
+
+        hide();
+        message.success(`Đã hiển thị tin tại: ${locData.displayName}`);
+      }
+    } catch (e) { hide(); message.error('Lỗi kết nối bản đồ'); }
   };
+  const fetchRoomsByParams = async (params) => {
+    setLoading(true);
+    setPage(0); // Reset về trang đầu tiên
+    try {
+      const res = await roomService.searchRooms({
+        lat: params.locationCoords.lat,
+        lng: params.locationCoords.lng,
+        radius: params.radius || 15000,
+        type: params.type || 'ALL',
+        keyword: params.keyword || '',
+        page: 0,
+        size: 8
+      });
 
+      // Cập nhật danh sách "Tin dành cho bạn"
+      setRooms(res.data.content || []);
+      setHasMore(res.data.content?.length === 8);
+    } catch (error) {
+      console.error("Lỗi tải lại tin:", error);
+    } finally {
+      setLoading(false);
+      setIsInitialLoad(false);
+    }
+  };
   // --- XỬ LÝ TÌM KIẾM & CHUYỂN TRANG ---
   const handleSearchNavigate = async () => {
     // 1. Chuẩn bị bộ lọc mặc định từ state hiện tại
@@ -454,25 +544,37 @@ const HomePage = () => {
 
               <div className="hidden md:block w-[1px] h-6 bg-gray-200"></div>
 
-              {/* Các nút Lọc Khu Vực, Loại Phòng giữ nguyên */}
-              <Popover content={<LocationSelectContent onClose={() => setOpenLocation(false)} onApply={handleApplyLocation} />} trigger="click" open={openLocation} onOpenChange={setOpenLocation} placement="bottom" arrow={false}>
-                <Button className="border-none shadow-none text-gray-700 font-medium hover:bg-gray-50 flex items-center">
-                  <EnvironmentFilled className="text-[#f96302]" /> <span className="truncate max-w-[120px]">{filters.locationName}</span> <DownOutlined className="text-xs text-gray-400" />
-                </Button>
-              </Popover>
 
-              <Popover content={<TypeSelectContent currentType={filters.type} onClose={() => setOpenType(false)} onApply={(val) => { setFilters(prev => ({ ...prev, type: val })); fetchRooms({ type: val }); }} />} trigger="click" open={openType} onOpenChange={setOpenType} placement="bottom" arrow={false}>
-                <Button className="border-none shadow-none text-gray-700 font-medium hover:bg-gray-50 bg-gray-100 flex items-center h-9 rounded">
-                  <HomeFilled className="text-[#f96302]" /> <span>Loại phòng</span> <DownOutlined className="text-xs text-gray-400" />
-                </Button>
+
+              <Popover
+                content={
+                  <TypeSelectContent
+                    currentType={filters.type}
+                    onClose={() => setOpenType(false)}
+                    onApply={(val) => {
+                      const newFilters = { ...filters, type: val };
+                      setFilters(newFilters);
+                      fetchRooms(false, newFilters); // 🟢 Gọi fetch ngay với loại phòng mới
+                      fetchLocationCounts(val);
+                    }}
+                  />
+                }
+                trigger="click"
+                open={openType}
+                onOpenChange={setOpenType}
+                placement="bottom"
+                arrow={false}
+              >
+
               </Popover>
 
               <Button
                 type="primary"
-                className="px-6 font-bold h-9"
+                size="large"
+                className="px-8 font-bold h-10 bg-[#f96302] text-white border-none hover:bg-[#d85502] transition-all"
                 onClick={handleSearchNavigate}
               >
-                Tìm ngay
+                TÌM NGAY
               </Button>
             </div>
           </div>
@@ -484,8 +586,11 @@ const HomePage = () => {
           <div className="bg-white p-5 rounded-lg shadow-sm">
             <div className="flex justify-between items-center mb-4">
               <Title level={4} style={{ margin: 0 }}>Tin cho thuê mới đăng</Title>
-              <Button type="link" className="text-gray-500 hover:text-[#f96302]">Xem tất cả <RightOutlined /></Button>
+              <Button type="link" className="text-gray-500 hover:text-[#f96302]">
+                Xem tất cả <RightOutlined />
+              </Button>
             </div>
+
             {loadingNew ? (
               <div className="flex gap-4 overflow-hidden">
                 {[1, 2, 3, 4].map(i => <Skeleton.Image key={i} active style={{ width: 220, height: 160 }} />)}
@@ -494,24 +599,55 @@ const HomePage = () => {
               <Empty description="Chưa có tin đăng nào" image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               <div className="flex gap-4 overflow-x-auto pb-4 custom-scrollbar">
-                {newListings.map((item) => (
-                  <div key={item.id} className="min-w-[220px] max-w-[220px] group cursor-pointer" onClick={() => navigate(`/rooms/${item.id}`)}>
-                    <div className="relative h-[160px] rounded-lg overflow-hidden mb-2">
-                      <img
-                        src={item.images?.[0] || 'https://via.placeholder.com/200'}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                        alt="room"
-                      />
-                      <div className="absolute bottom-2 right-2 text-[10px] text-white font-medium drop-shadow-md">Mới đăng</div>
+                {newListings.map((item) => {
+                  // Kiểm tra xem tin có phải là VIP hay không
+                  const isVip = item.priorityLevel && item.priorityLevel > 0;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="min-w-[220px] max-w-[220px] group cursor-pointer"
+                      onClick={() => navigate(`/rooms/${item.id}`)}
+                    >
+                      <div className="relative h-[160px] rounded-lg overflow-hidden mb-2">
+                        <img
+                          src={item.images?.[0] || 'https://via.placeholder.com/200'}
+                          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                          alt="room"
+                        />
+
+
+                        {isVip && (
+                          <Tag color="#fadb14" className="absolute top-2 left-2 border-none font-bold text-[10px] m-0 flex items-center gap-1 shadow-sm text-black px-1.5 py-0.5 z-10">
+                            <CrownFilled /> VIP
+                          </Tag>
+                        )}
+
+                        {/* --- 2. NHÃN TRẠNG THÁI MẶC ĐỊNH --- */}
+                        <div className="absolute bottom-2 right-2 text-[10px] text-white font-medium drop-shadow-md bg-black/40 px-2 py-0.5 rounded">
+                          Mới đăng
+                        </div>
+                      </div>
+
+                      {/* --- 3. TIÊU ĐỀ: Tự động đổi màu và in đậm nếu là tin VIP --- */}
+                      <h3 className={`font-medium text-sm line-clamp-2 mb-1 transition-colors ${isVip ? 'text-[#f96302] font-bold' : 'text-gray-800 group-hover:text-[#f96302]'}`}>
+                        {item.title}
+                      </h3>
+
+                      <div className="text-red-600 font-bold text-base mb-1">
+                        {formatCurrency(item.price)}/tháng
+                      </div>
+
+                      <div className="text-xs text-gray-400 flex items-center truncate">
+                        <EnvironmentFilled className="mr-1 text-gray-300" /> {item.address}
+                      </div>
                     </div>
-                    <h3 className="font-medium text-gray-800 text-sm line-clamp-2 mb-1 group-hover:text-[#f96302] transition-colors">{item.title}</h3>
-                    <div className="text-red-600 font-bold text-base mb-1">{formatCurrency(item.price)}/tháng</div>
-                    <div className="text-xs text-gray-400 flex items-center truncate"><EnvironmentFilled className="mr-1 text-gray-300" /> {item.address}</div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
+
 
           {/* SECTION 2: KHU VỰC NỔI BẬT */}
           <div className="bg-white p-5 rounded-lg shadow-sm">
@@ -519,7 +655,6 @@ const HomePage = () => {
               <div className="flex items-center gap-4">
                 <Title level={4} style={{ margin: 0 }}>Khu vực cho thuê nổi bật</Title>
               </div>
-              {/* Tabs với onChange handler để cập nhật state activeTabType */}
               <Tabs
                 defaultActiveKey="1"
                 items={[
@@ -537,14 +672,13 @@ const HomePage = () => {
                 <div
                   key={loc.id}
                   className={`relative rounded-lg overflow-hidden cursor-pointer group ${loc.colSpan === 2 ? 'md:col-span-2 md:row-span-2' : 'md:col-span-1 md:row-span-1'} h-[160px] md:h-auto`}
-                  // 👇 4. Cập nhật sự kiện click vào khu vực -> Chuyển trang kèm tham số
                   onClick={() => {
                     navigate('/filter', {
                       state: {
                         locationName: loc.name,
                         locationCoords: { lat: loc.lat, lng: loc.lng },
-                        radius: 20000,
-                        type: activeTabType, // Lấy loại hình đang chọn
+                        radius: 15000,
+                        type: activeTabType,
                         keyword: ''
                       }
                     });
@@ -552,12 +686,19 @@ const HomePage = () => {
                 >
                   <img src={loc.img} alt={loc.name} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
                   <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div>
-                  <div className="absolute bottom-4 left-4 text-white">
-                    <h3 className="text-lg font-bold mb-0">{loc.name}</h3>
-                    {/* HIỂN THỊ SỐ LƯỢNG ĐÃ ĐẾM */}
-                    <span className="text-sm opacity-90 font-medium">
-                      {loc.count > 0 ? `${loc.count} tin đăng` : 'Chưa có tin'}
-                    </span>
+
+                  {/* VỊ TRÍ CODE BẠN GỬI ĐẶT TẠI ĐÂY */}
+                  <div className="absolute bottom-4 left-4 text-white z-10">
+                    <h3 className="text-lg md:text-xl font-bold mb-0 text-white drop-shadow-md">
+                      {loc.name}
+                    </h3>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      {/* Chấm xanh khi có tin (>0), chấm xám khi không có (0) */}
+                      <span className={`w-2 h-2 rounded-full ${loc.count > 0 ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></span>
+                      <span className="text-xs md:text-sm font-medium opacity-90">
+                        {(loc.count || 0).toLocaleString()} tin đăng
+                      </span>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -570,7 +711,7 @@ const HomePage = () => {
           <div className="mt-8">
             <div className="flex justify-between items-center mb-4">
               <Title level={4}>Tin dành cho bạn</Title>
-              <Button icon={<AimOutlined />} onClick={() => navigate('/search')}>Xem trên bản đồ</Button>
+
             </div>
 
             {loading && isInitialLoad ? (
@@ -580,36 +721,54 @@ const HomePage = () => {
             ) : (
               <>
                 <Row gutter={[16, 16]}>
-                  {rooms.map(room => (
-                    <Col xs={24} sm={12} md={8} lg={6} key={room.id}>
-                      <Card
-                        hoverable
-                        className="rounded-lg overflow-hidden border border-gray-200 shadow-none hover:shadow-lg transition-all h-full flex flex-col"
-                        bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
-                        cover={
-                          <div className="relative h-48 overflow-hidden">
-                            <img
-                              alt={room.title}
-                              src={room.images?.[0] || 'https://via.placeholder.com/400'}
-                              className="w-full h-full object-cover transition-transform duration-500 hover:scale-105"
-                              loading="lazy"
-                            />
-                            <Tag color="#f96302" className="absolute top-2 left-2 border-none font-semibold text-xs">
-                              {room.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Ở ghép'}
-                            </Tag>
+                  {rooms.map(room => {
+                    // 🟢 1. LOGIC MỚI: Xác định VIP
+                    const isVip = room.priorityLevel && room.priorityLevel > 0;
+
+                    return (
+                      <Col xs={24} sm={12} md={8} lg={6} key={room.id}>
+                        <Card
+                          hoverable
+                          // 🟢 2. STYLE CARD: Nếu VIP thì viền cam, đổ bóng đậm hơn
+                          className={`rounded-lg overflow-hidden transition-all h-full flex flex-col ${isVip ? 'border-2 border-orange-200 shadow-md' : 'border border-gray-200 shadow-none hover:shadow-lg'}`}
+                          bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
+                          cover={
+                            <div className="relative h-48 overflow-hidden">
+                              <img alt={room.title} src={room.images?.[0] || 'https://via.placeholder.com/400'} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" loading="lazy" />
+
+                              {/* Tag Loại hình (giữ nguyên) */}
+                              <Tag color="#f96302" className="absolute top-2 left-2 border-none font-semibold text-xs">{room.rentalType === 'WHOLE' ? 'Nguyên căn' : 'Ở ghép'}</Tag>
+
+                              {isVip && (
+                                <Tag color="#fadb14" className="absolute top-2 right-2 border-none font-bold text-[10px] m-0 flex items-center gap-1 shadow-sm text-black px-1.5 py-0.5 z-10">
+                                  <CrownFilled /> VIP
+                                </Tag>
+                              )}
+
+                              {/* 🟢 4. ICON LỬA (Cho tin cực hot - Priority cao) */}
+                              {room.priorityLevel >= 50 && (
+                                <div className="absolute bottom-2 left-2 text-[#fadb14] animate-bounce drop-shadow-md">
+                                  <FireFilled style={{ fontSize: '18px' }} />
+                                </div>
+                              )}
+                            </div>
+                          }
+                          onClick={() => navigate(`/rooms/${room.id}`)}
+                        >
+                          {/* 🟢 5. TIÊU ĐỀ VIP: Có icon Vương miện đầu dòng */}
+                          <h3 className={`font-bold text-sm mb-1 line-clamp-2 h-10 flex items-start gap-1 ${isVip ? 'text-[#f96302]' : 'text-gray-800'}`} title={room.title}>
+                            {isVip && <CrownFilled className="mt-1 flex-shrink-0" />} {room.title}
+                          </h3>
+
+                          <div className="text-xs text-gray-500 mb-2 truncate"><EnvironmentFilled className="mr-1 text-gray-400" />{room.address}</div>
+                          <div className="mt-auto pt-2 border-t border-dashed border-gray-200 flex justify-between items-end">
+                            <span className="text-[#f96302] font-bold text-base">{formatCurrency(room.price)}/tháng</span>
+                            <span className="text-xs text-gray-400">{room.area} m²</span>
                           </div>
-                        }
-                        onClick={() => navigate(`/rooms/${room.id}`)}
-                      >
-                        <h3 className="font-bold text-sm text-gray-800 mb-1 line-clamp-2 h-10" title={room.title}>{room.title}</h3>
-                        <div className="text-xs text-gray-500 mb-2 truncate"><EnvironmentFilled className="mr-1 text-gray-400" />{room.address}</div>
-                        <div className="mt-auto pt-2 border-t border-dashed border-gray-200 flex justify-between items-end">
-                          <span className="text-[#f96302] font-bold text-base">{formatCurrency(room.price)}/tháng</span>
-                          <span className="text-xs text-gray-400">{room.area} m²</span>
-                        </div>
-                      </Card>
-                    </Col>
-                  ))}
+                        </Card>
+                      </Col>
+                    );
+                  })}
                 </Row>
 
                 {/* --- NÚT ĐIỀU KHIỂN NẰM GIỮA --- */}

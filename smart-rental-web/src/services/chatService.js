@@ -2,36 +2,34 @@ import axiosClient from "../config/axiosClient";
 
 const chatService = {
   // 1. Lấy danh sách những người đã từng chat (Sidebar trái)
-  getConversations: async () => {
-    return await axiosClient.get("/chat/conversations");
+  getConversations: () => {
+    return axiosClient.get("/chat/conversations");
   },
 
   // 2. Lấy lịch sử tin nhắn với một người (Main Chat)
-  getChatHistory: async (userId) => {
-    return await axiosClient.get(`/chat/history/${userId}`);
+  getChatHistory: (partnerId) => {
+    return axiosClient.get(`/chat/history/${partnerId}`);
   },
 
-  // 3. Gửi tin nhắn HTTP (Fallback nếu không dùng socket hoặc gửi ảnh sau này)
-  sendMessage: async (receiverId, content) => {
-    return await axiosClient.post("/chat/send", {
+  // 3. Gửi tin nhắn (Cả TEXT và IMAGE)
+  // senderId sẽ được Backend lấy từ Token, bạn chỉ cần gửi receiverId
+  sendMessage: (receiverId, content, type = "TEXT") => {
+    return axiosClient.post("/chat/send", {
       receiverId: receiverId,
       content: content,
-      type: "TEXT"
+      type: type // Có thể là "TEXT" hoặc "IMAGE"
     });
   },
 
-  // --- [MỚI] 4. Bắt đầu cuộc trò chuyện (Dùng cho nút "Chat ngay" ở trang Room Detail) ---
-  // API này gọi đến endpoint @PostMapping("/start") ở Backend
-  startConversation: async (partnerId) => {
-    return await axiosClient.post("/chat/start", {
-      partnerId: partnerId
-    });
+  // 4. Bắt đầu cuộc trò chuyện mới (Dùng khi nhấn "Chat ngay" ở trang chi tiết phòng)
+  startConversation: (partnerId) => {
+    return axiosClient.post("/chat/start", { partnerId });
   },
 
-  // --- [TÙY CHỌN] 5. Đánh dấu đã đọc (Nếu muốn xử lý badge thông báo) ---
-  // Bạn có thể thêm API này ở backend sau nếu muốn làm tính năng "Đã xem"
-  markAsRead: async (partnerId) => {
-    // return await axiosClient.put(`/chat/read/${partnerId}`);
+  // 🟢 5. Đánh dấu đã đọc (Xóa badge thông báo đỏ)
+  // Khớp với @PutMapping("/mark-as-read/{partnerId}") ở Backend
+  markAsRead: (partnerId) => {
+    return axiosClient.put(`/chat/mark-as-read/${partnerId}`);
   }
 };
 

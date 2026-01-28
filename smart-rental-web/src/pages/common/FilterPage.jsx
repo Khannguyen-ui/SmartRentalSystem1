@@ -9,7 +9,7 @@ import {
   EnvironmentOutlined, HeartOutlined, UserOutlined, FilterOutlined,
   AppstoreOutlined, UnorderedListOutlined, EnvironmentFilled, HomeFilled,
   DownOutlined, CameraFilled, CheckOutlined,
-  RightOutlined, SearchOutlined, AimOutlined
+  RightOutlined, SearchOutlined, AimOutlined, CrownFilled, FireFilled
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
 import relativeTime from 'dayjs/plugin/relativeTime';
@@ -256,6 +256,7 @@ const FilterPage = () => {
 
   // State khởi tạo từ trang trước hoặc URL
   const getInitialFilters = () => {
+    // 1. Ưu tiên lấy từ URL Params (Khi reload trang hoặc share link)
     const lat = searchParams.get('lat');
     const lng = searchParams.get('lng');
 
@@ -268,10 +269,19 @@ const FilterPage = () => {
         radius: parseInt(searchParams.get('radius') || '20000')
       };
     }
-    // Fallback location.state
-    return location.state || {
-      keyword: '', type: 'ALL', locationName: 'Hồ Chí Minh',
-      locationCoords: { lat: 10.7769, lng: 106.7009 }, radius: 20000
+
+    // 2. Lấy từ location.state (Khi navigate từ trang Home)
+    // 🟢 SỬA LỖI TẠI ĐÂY:
+    const state = location.state || {}; // Lấy state hoặc rỗng
+
+    return {
+      keyword: state.keyword || '',
+      type: state.type || 'ALL',
+      locationName: state.locationName || 'Hồ Chí Minh',
+
+      locationCoords: state.locationCoords || { lat: 10.7769, lng: 106.7009 },
+
+      radius: state.radius || 20000
     };
   };
 
@@ -315,56 +325,78 @@ const FilterPage = () => {
   // --- GỌI API LẤY CHỦ TRỌ NỔI BẬT ---
   useEffect(() => {
     const fetchTopLandlords = async () => {
-      if (!filters.locationCoords) return;
-      try {
-        const res = await userService.getTopLandlords(
-          filters.locationCoords.lat,
-          filters.locationCoords.lng,
-          filters.radius || 20000
-        );
-        setTopLandlords(res.data);
-      } catch (error) {
-        console.error("Lỗi lấy top chủ trọ", error);
-      }
+        if (!filters.locationCoords?.lat) return;
+        try {
+            const res = await userService.getTopLandlords(
+                filters.locationCoords.lat,
+                filters.locationCoords.lng,
+                filters.radius || 20000
+            );
+            setTopLandlords(res.data);
+        } catch (error) {
+            console.error("Lỗi lấy top chủ trọ", error);
+        }
     };
     fetchTopLandlords();
-  }, [filters.locationCoords]);
+    // 🟢 Cần thêm filters.radius vào đây để cập nhật khi kéo Slider bán kính
+}, [filters.locationCoords, filters.radius]);
+
+  // Trong file FilterPage.jsx
 
   const fetchRooms = async () => {
     setLoading(true);
     try {
-      const res = await roomService.searchRooms({
+      // 🟢 GIỮ NGUYÊN LOGIC CŨ, CHỈ THÊM THAM SỐ VÀO ĐÂY
+      const params = {
         lat: filters.locationCoords.lat,
         lng: filters.locationCoords.lng,
         radius: filters.radius || 20000,
         keyword: filters.keyword,
         type: filters.type,
-        // Gửi trang hiện tại (Backend tính từ 0)
         page: currentPage - 1,
-        size: pageSize
+        size: pageSize,
+
+        // --- PHẦN THÊM MỚI (ĐỂ LỌC ĐƯỢC) ---
+        minPrice: priceRange[0],
+        maxPrice: priceRange[1],
+        minArea: areaRange.min,
+        maxArea: areaRange.max,
+        // Chuyển mảng thành chuỗi (VD: "1,2") để gửi xuống Backend
+        bedroomList: selectedBedrooms.length > 0 ? selectedBedrooms.join(',') : null,
+        bathroomList: selectedBathrooms.length > 0 ? selectedBathrooms.join(',') : null,
+        directionList: selectedDirection.length > 0 ? selectedDirection.join(',') : null,
+        furniture: selectedFurniture || null
+      };
+
+      // Gọi service (Giữ nguyên)
+      const res = await roomService.searchRooms(params);
+
+      let data = res.data.content || [];
+      setTotalElements(res.data.totalElements || 0);
+
+      // GIỮ NGUYÊN LOGIC SẮP XẾP CỦA BẠN (Client side sort)
+      // Lưu ý: Backend đã sắp xếp theo khoảng cách, nhưng đoạn này sẽ ưu tiên VIP
+      data.sort((a, b) => {
+        const priorityA = a.priorityLevel || 0;
+        const priorityB = b.priorityLevel || 0;
+        if (priorityA !== priorityB) {
+          return priorityB - priorityA;
+        }
+        return new Date(b.createdAt) - new Date(a.createdAt);
       });
 
-      // 🟢 SỬA TẠI ĐÂY: Lấy content từ Page object
-      let data = res.data.content || [];
-      setTotalElements(res.data.totalElements || 0); // Cập nhật tổng số để hiện thanh số trang
-
       const mappedData = data.map(r => ({
-
         ...r,
-
         images: (r.images && r.images.length > 0) ? r.images : ['https://via.placeholder.com/300x200?text=No+Image'],
-
         time: r.approvedAt ? dayjs(r.approvedAt).fromNow() : (r.createdAt ? dayjs(r.createdAt).fromNow() : 'Vừa xong'),
-
-        isPro: r.servicePackageId && r.servicePackageId > 1
-
+        isVip: r.priorityLevel && r.priorityLevel > 0
       }));
 
-      setRooms(mappedData); // Cập nhật trực tiếp vào state rooms
-      window.scrollTo({ top: 0, behavior: 'smooth' }); // Cuộn lên đầu trang sau khi chuyển số
+      setRooms(mappedData);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (error) {
       console.error(error);
-      messageApi.error("Lỗi tải dữ liệu"); // Dùng messageApi mới fix lỗi Warning
+      messageApi.error("Lỗi tải dữ liệu");
     } finally {
       setLoading(false);
     }
@@ -508,73 +540,148 @@ const FilterPage = () => {
   );
 
   // --- RENDER DẠNG DANH SÁCH (LIST VIEW) ---
+  // --- RENDER DẠNG DANH SÁCH (LIST VIEW) ---
   const renderListView = () => (
     <div className="flex flex-col gap-3">
-      {rooms.map(room => (
-        <Card key={room.id} hoverable className="overflow-hidden border border-gray-200 shadow-none hover:shadow-md transition-all rounded-md bg-white" bodyStyle={{ padding: 0 }} onClick={() => navigate(`/rooms/${room.id}`)}>
-          <div className="flex flex-col sm:flex-row h-full">
-            <div className="w-full sm:w-[260px] h-[170px] relative flex-shrink-0">
-              <img src={room.images?.[0] || 'https://via.placeholder.com/300'} className="h-full w-full object-cover" alt="main" />
-              {room.isPro && <div className="absolute bottom-1.5 left-1.5 text-[10px] bg-[#dfdfdf] text-gray-600 px-1.5 py-0.5 rounded flex items-center">Tin ưu tiên</div>}
-              <div className="absolute bottom-1.5 right-1.5 text-white flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded text-[10px]"><CameraFilled /> {room.images?.length || 0}</div>
-            </div>
-            <div className="p-3 flex-grow flex flex-col justify-between">
-              <div>
-                <h3 className="text-[15px] font-medium text-gray-800 mb-1 line-clamp-2">{room.title}</h3>
-                <div className="text-xs text-gray-500 mb-1 line-clamp-1">{room.description || room.address}</div>
-                <div className="flex items-baseline gap-3 mt-1">
-                  <span className="text-[#d0021b] font-bold text-[16px]">{formatCurrency(room.price)}/tháng</span>
-                  <span className="text-gray-500 text-sm">{room.area} m²</span>
-                  <span className="text-gray-500 text-sm">{room.capacity} PN</span>
+      {rooms.map(room => {
+        // Check VIP từ priorityLevel
+        const isVip = room.priorityLevel && room.priorityLevel > 0;
+
+        return (
+          <Card
+            key={room.id}
+            hoverable
+            className={`overflow-hidden border shadow-none hover:shadow-md transition-all rounded-md bg-white ${isVip ? 'border-orange-200 border-2 shadow-sm' : 'border-gray-200'
+              }`}
+            bodyStyle={{ padding: 0 }}
+            onClick={() => navigate(`/rooms/${room.id}`)}
+          >
+            <div className="flex flex-col sm:flex-row h-full">
+              {/* CỘT ẢNH */}
+              <div className="w-full sm:w-[260px] h-[170px] relative flex-shrink-0">
+                <img src={room.images?.[0] || 'https://via.placeholder.com/300'} className="h-full w-full object-cover" alt="main" />
+
+                {/* 🟢 TAG VIP ĐỒNG BỘ HOME PAGE */}
+                {isVip && (
+                  <Tag color="#fadb14" className="absolute top-2 left-2 border-none font-bold text-[10px] m-0 flex items-center gap-1 shadow-sm text-black px-1.5 py-0.5 z-10">
+                    <CrownFilled /> VIP
+                  </Tag>
+                )}
+
+                {/* 🟢 ICON LỬA (NẾU PRIORITY CAO >= 50) */}
+                {room.priorityLevel >= 50 && (
+                  <div className="absolute bottom-2 left-2 text-[#fadb14] animate-bounce drop-shadow-md z-10">
+                    <FireFilled style={{ fontSize: '18px' }} />
+                  </div>
+                )}
+
+                <div className="absolute bottom-1.5 right-1.5 text-white flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded text-[10px]">
+                  <CameraFilled /> {room.images?.length || 0}
                 </div>
-                <div className="text-xs text-gray-500 mt-2 flex items-center gap-1"><EnvironmentOutlined /> {room.address}</div>
               </div>
-              <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-gray-100">
-                <div className="flex items-center gap-2">
-                  <Avatar size={20} icon={<UserOutlined />} />
-                  <span className="text-xs text-gray-600 font-medium truncate max-w-[120px]">{room.landlordName || "Người đăng"}</span>
-                  <span className="text-[10px] text-gray-400">• {room.time}</span>
+
+              {/* CỘT NỘI DUNG */}
+              <div className="p-3 flex-grow flex flex-col justify-between">
+                <div>
+                  <h3 className={`text-[15px] font-bold mb-1 line-clamp-2 transition-colors flex items-start gap-1 ${isVip ? 'text-[#f96302]' : 'text-gray-800'
+                    }`}>
+                    {isVip && <CrownFilled className="mt-1 flex-shrink-0" />} {room.title}
+                  </h3>
+
+                  <div className="text-xs text-gray-500 mb-1 line-clamp-1">{room.description || room.address}</div>
+                  <div className="flex items-baseline gap-3 mt-1">
+                    <span className="text-[#d0021b] font-bold text-[16px]">{formatCurrency(room.price)}/tháng</span>
+                    <span className="text-gray-500 text-sm">{room.area} m²</span>
+                    <span className="text-gray-500 text-sm">{room.capacity} PN</span>
+                  </div>
+                  <div className="text-xs text-gray-500 mt-2 flex items-center gap-1"><EnvironmentOutlined /> {room.address}</div>
                 </div>
-                <HeartOutlined className="text-gray-400 text-lg hover:text-red-500 cursor-pointer" />
+
+                <div className="flex justify-between items-center mt-2 pt-2 border-t border-dashed border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Avatar size={20} src={room.landlordAvatar} icon={<UserOutlined />} />
+                    <span className="text-xs text-gray-600 font-medium truncate max-w-[120px]">{room.landlordName || "Người đăng"}</span>
+                    <span className="text-[10px] text-gray-400">• {room.time}</span>
+                  </div>
+                  <HeartOutlined className="text-gray-400 text-lg hover:text-red-500 cursor-pointer" />
+                </div>
               </div>
             </div>
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 
   // --- RENDER DẠNG LƯỚI (GRID VIEW) ---
+  // --- RENDER DẠNG LƯỚI (GRID VIEW) ---
   const renderGridView = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {rooms.map(room => (
-        <Card key={room.id} hoverable className="overflow-hidden border border-gray-200 shadow-none hover:shadow-md transition-all rounded-md bg-white flex flex-col h-full" bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
-          cover={
-            <div className="relative h-48 w-full">
-              <img src={room.images?.[0] || 'https://via.placeholder.com/300'} className="h-full w-full object-cover" alt="main" />
-              {room.isPro && <div className="absolute bottom-2 left-2 text-[10px] bg-[#dfdfdf] text-gray-600 px-1.5 py-0.5 rounded">Tin ưu tiên</div>}
-              <div className="absolute bottom-2 right-2 text-white flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded text-[10px]"><CameraFilled /> {room.images?.length || 0}</div>
+      {rooms.map(room => {
+        const isVip = room.priorityLevel && room.priorityLevel > 0;
+
+        return (
+          <Card
+            key={room.id}
+            hoverable
+            className={`overflow-hidden border shadow-none hover:shadow-md transition-all rounded-md bg-white flex flex-col h-full ${isVip ? 'border-orange-200 border-2 shadow-sm' : 'border-gray-200'
+              }`}
+            bodyStyle={{ padding: '12px', flex: 1, display: 'flex', flexDirection: 'column' }}
+            cover={
+              <div className="relative h-48 w-full overflow-hidden">
+                <img
+                  src={room.images?.[0] || 'https://via.placeholder.com/300'}
+                  className="h-full w-full object-cover transition-transform duration-500 hover:scale-110"
+                  alt="main"
+                />
+
+                {/* 🟢 TAG VIP */}
+                {isVip && (
+                  <Tag color="#fadb14" className="absolute top-2 right-2 border-none font-bold text-[10px] m-0 flex items-center gap-1 shadow-sm text-black px-1.5 py-0.5 z-10">
+                    <CrownFilled /> VIP
+                  </Tag>
+                )}
+
+                {/* 🟢 ICON LỬA */}
+                {room.priorityLevel >= 50 && (
+                  <div className="absolute bottom-2 left-2 text-[#fadb14] animate-bounce drop-shadow-md z-10">
+                    <FireFilled style={{ fontSize: '18px' }} />
+                  </div>
+                )}
+
+                <div className="absolute bottom-2 right-2 text-white flex items-center gap-1 bg-black/40 px-1.5 py-0.5 rounded text-[10px]">
+                  <CameraFilled /> {room.images?.length || 0}
+                </div>
+              </div>
+            }
+            onClick={() => navigate(`/rooms/${room.id}`)}
+          >
+            <div className="flex-grow">
+              <h3 className={`text-[14px] font-bold mb-1 line-clamp-2 h-10 transition-colors flex items-start gap-1 ${isVip ? 'text-[#f96302]' : 'text-gray-800'
+                }`} title={room.title}>
+                {isVip && <CrownFilled className="mt-1 flex-shrink-0" />} {room.title}
+              </h3>
+
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-[#d0021b] font-bold text-[15px]">{formatCurrency(room.price)}/tháng</span>
+                <span className="text-gray-400 text-xs">• {room.area} m²</span>
+              </div>
+              <div className="text-xs text-gray-500 flex items-center gap-1 mb-2 truncate">
+                <EnvironmentOutlined /> {room.address}
+              </div>
             </div>
-          }
-          onClick={() => navigate(`/rooms/${room.id}`)}
-        >
-          <div className="flex-grow">
-            <h3 className="text-[14px] font-medium text-gray-800 mb-1 line-clamp-2 h-10">{room.title}</h3>
-            <div className="flex items-baseline gap-2 mb-1">
-              <span className="text-[#d0021b] font-bold text-[15px]">{formatCurrency(room.price)}/tháng</span>
-              <span className="text-gray-400 text-xs">• {room.area} m²</span>
+            <div className="flex justify-between items-center mt-auto pt-2 border-t border-dashed border-gray-100">
+              <div className="flex items-center gap-2">
+                <Avatar size={20} src={room.landlordAvatar} icon={<UserOutlined />} />
+                <span className="text-xs text-gray-600 truncate max-w-[80px]">
+                  {room.landlordName || "Người đăng"}
+                </span>
+              </div>
+              <HeartOutlined className="text-gray-400 hover:text-red-500 cursor-pointer transition-colors" />
             </div>
-            <div className="text-xs text-gray-500 flex items-center gap-1 mb-2 truncate"><EnvironmentOutlined /> {room.address}</div>
-          </div>
-          <div className="flex justify-between items-center mt-auto pt-2 border-t border-dashed border-gray-100">
-            <div className="flex items-center gap-2">
-              <Avatar size={20} icon={<UserOutlined />} />
-              <span className="text-xs text-gray-600 truncate max-w-[80px]">{room.landlordName || "Người đăng"}</span>
-            </div>
-            <HeartOutlined className="text-gray-400 hover:text-red-500 cursor-pointer" />
-          </div>
-        </Card>
-      ))}
+          </Card>
+        );
+      })}
     </div>
   );
 
@@ -617,8 +724,18 @@ const FilterPage = () => {
                 size="large"
                 type="default"
                 icon={<AimOutlined />}
-                onClick={() => navigate('/search')}
-                className="flex items-center"
+                onClick={() => {
+                  // Truyền tất cả params hiện tại sang trang bản đồ
+                  const params = new URLSearchParams({
+                    lat: filters.locationCoords.lat,
+                    lng: filters.locationCoords.lng,
+                    radius: filters.radius || 20000,
+                    keyword: filters.keyword || '',
+                    type: filters.type || 'ALL'
+                  });
+                  navigate(`/search?${params.toString()}`);
+                }}
+                className="flex items-center border-[#f96302] text-[#f96302] hover:bg-orange-50"
               >
                 Bản đồ
               </Button>
@@ -709,7 +826,7 @@ const FilterPage = () => {
                 rooms.length === 0 ? <Empty description="Không có tin đăng nào phù hợp" className="py-10 bg-white rounded" /> :
                   (
                     <>
-                      
+
                       {viewMode === 'list' ? renderListView(rooms) : renderGridView(rooms)}
 
                       {/* --- THANH PHÂN TRANG --- */}

@@ -21,6 +21,16 @@ const roomService = {
     return axiosClient.put(`/rooms/${id}`, data);
   },
 
+  // Tin có video
+  getVideoRooms: (params) => {
+    return axiosClient.get('/rooms/videos', {
+      params: {
+        page: params?.page || 0,
+        size: params?.size || 4
+      }
+    });
+  },
+
   // 5. Upload ảnh/video
   uploadImage: (file) => {
     const formData = new FormData();
@@ -31,32 +41,20 @@ const roomService = {
   },
 
   // 6. Master Data
-  getAllAmenities: () => axiosClient.get('/admin/amenities'),
-  getAllPackages: () => axiosClient.get('/admin/packages'),
+  getAllAmenities: () => axiosClient.get('/admin/master-data/amenities'),
+  getAllPackages: () => axiosClient.get('/admin/master-data/packages'),
 
   // 7. Lấy chi tiết phòng
   getRoomById: (id) => axiosClient.get(`/rooms/${id}`),
 
-  // =========================================================
-  // 👇 8. SỬA ĐOẠN NÀY ĐỂ KHỚP VỚI BACKEND 👇
-  // =========================================================
-  searchRooms: (filter) => {
+  // 🟢 8. TÌM KIẾM NÂNG CAO (Đã sửa: Nhận đúng params từ FilterPage)
+  searchRooms: (params) => {
     return axiosClient.get('/rooms/search', {
-      params: {
-        lat: filter.lat,
-        lng: filter.lng,
-        radius: filter.radius || 50000,
-        type: filter.type,
-        keyword: filter.keyword,
-        page: filter.page,
-        size: filter.size,
-
-
-      }
+      params: params 
     });
   },
 
-  // 9. Tìm kiếm gần đây
+  // 9. Tìm kiếm gần đây (Đơn giản)
   searchNearby: (lat, lng, radius = 10000) => {
     return axiosClient.get("/rooms/search", {
       params: { lat, lng, radius }
@@ -67,9 +65,41 @@ const roomService = {
   getRoomsByLandlord: (landlordId) => {
     return axiosClient.get(`/rooms/landlord/${landlordId}`);
   },
+
   // Giá khu vực
   getPriceHistory: (id) => {
     return axiosClient.get(`/rooms/${id}/price-history`);
+  },
+
+  // 10. Nâng cấp gói
+  upgradeRoomPackage: (roomId, packageId) => {
+    return axiosClient.post(`/rooms/${roomId}/upgrade`, {
+      servicePackageId: packageId
+    });
+  },
+  purchasePackage: (packageId) => {
+    return axiosClient.post('/transactions/purchase-package', packageId);
+  },
+
+  // 11. Đẩy tin
+  pushRoom: (roomId, packageId) => {
+    return axiosClient.post(`/rooms/${roomId}/push`, null, {
+      params: { packageId }
+    });
+  },
+
+  // 12. Cập nhật trạng thái
+  updateRoomStatus: (roomId, status) => {
+    return axiosClient.put(`/rooms/${roomId}/status`, null, {
+      params: { status }
+    });
+  },
+
+  // 13. Auto renew
+  toggleAutoRenew: (roomId, enable) => {
+    return axiosClient.put(`/rooms/${roomId}/auto-renew`, null, {
+      params: { enable }
+    });
   }
 };
 

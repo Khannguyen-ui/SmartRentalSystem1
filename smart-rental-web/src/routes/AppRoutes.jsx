@@ -38,7 +38,13 @@ import NotificationPage from '../pages/common/NotificationPage';
 import LandlordProfile from '../pages/common/LandlordProfile';
 
 // --- [MỚI] IMPORT TRANG CHAT ---
-import ChatPage from '../pages/common/ChatPage'; 
+import ChatPage from '../pages/common/ChatPage';
+import PaymentSuccess from '../pages/common/PaymentSuccess';
+import PaymentFailed from '../pages/common/PaymentFailed';
+import LandlordVIP from '../pages/landlord/LandlordVIP';
+import VIPServicePage from '../pages/landlord/LandlordVIP';
+import ForgotPassword from '../pages/auth/ForgotPassword';
+import ResetPassword from '../pages/auth/ResetPassword';
 
 const AppRoutes = () => {
     return (
@@ -51,13 +57,15 @@ const AppRoutes = () => {
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/register-landlord" element={<RegisterLandlord />} />
-                
+                <Route path="/forgot-password" element={<ForgotPassword />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
+
                 {/* Trang tìm kiếm, chi tiết phòng (Public xem được) */}
                 <Route path="/search" element={<SearchMap />} />
                 <Route path="/filter" element={<FilterPage />} />
                 <Route path="/users/public-profile/:id" element={<LandlordProfile />} />
                 <Route path="/rooms/:id" element={<RoomDetail />} />
-                
+
                 <Route path="/admin/login" element={<AdminLogin />} />
             </Route>
 
@@ -75,9 +83,10 @@ const AppRoutes = () => {
 
                     {/* Trang Thông báo */}
                     <Route path="/notifications" element={<NotificationPage />} />
-
+                    <Route path="/payment-failed" element={<PaymentFailed />} />
                     {/* --- [MỚI] TRANG TIN NHẮN (Dùng chung cho Tenant & Landlord) --- */}
                     <Route path="/messages" element={<ChatPage />} />
+                    <Route path="/payment-success" element={<PaymentSuccess />} />
                 </Route>
             </Route>
 
@@ -97,13 +106,14 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute allowedRoles={['LANDLORD']} />}>
                 <Route path="/landlord" element={<MainLayout />}>
                     <Route index element={<Navigate to="room-list" />} />
-                    
-                    <Route path="dashboard" element={<LandlordDashboard/>} />
+
+                    <Route path="dashboard" element={<LandlordDashboard />} />
                     <Route path="create-room" element={<CreateRoom />} />
                     <Route path="room-list" element={<MyRooms />} />
                     <Route path="appointments" element={<AppointmentManagement />} />
                     <Route path="customers" element={<CustomerManagement />} />
                     <Route path="finance" element={<LandlordFinance />} />
+                    <Route path="vip-packages" element={<VIPServicePage />} />
                 </Route>
             </Route>
 
@@ -113,7 +123,7 @@ const AppRoutes = () => {
             <Route element={<ProtectedRoute allowedRoles={['ADMIN']} />}>
                 <Route path="/admin" element={<MainLayout />}>
                     <Route index element={<Navigate to="approve-rooms" />} />
-                    
+
                     <Route path="dashboard" element={<div>Trang Thống Kê</div>} />
                     <Route path="approve-rooms" element={<RoomApprove />} />
                     <Route path="master-data" element={<MasterData />} />

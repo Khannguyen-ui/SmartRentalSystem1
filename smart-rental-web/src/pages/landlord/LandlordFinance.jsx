@@ -1,21 +1,24 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Tabs, Card, Statistic, Button, Table, Tag, List, 
-  Avatar, InputNumber, message, Modal, Typography, Row, Col, Badge 
+import {
+  Tabs, Card, Statistic, Button, Table, Tag, List,
+  Avatar, InputNumber, message, Typography, Row, Col, Badge
 } from 'antd';
-import { 
-  WalletOutlined, BellOutlined, HistoryOutlined, 
-  CheckCircleOutlined, DollarOutlined, CreditCardOutlined 
+import {
+  WalletOutlined, BellOutlined, HistoryOutlined,
+  CheckCircleOutlined, CreditCardOutlined,
+  ArrowDownOutlined, ArrowUpOutlined, RocketOutlined
 } from '@ant-design/icons';
 import dayjs from 'dayjs';
+import relativeTime from 'dayjs/plugin/relativeTime';
 import paymentService from '../../services/paymentService';
 import notificationService from '../../services/notificationService';
-import useAuth from '../../hooks/useAuth'; 
+import useAuth from '../../hooks/useAuth';
 
+dayjs.extend(relativeTime);
 const { Title, Text } = Typography;
 
 const LandlordFinance = () => {
-  const { user } = useAuth(); // Lấy thông tin user đăng nhập
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('1');
 
   // --- STATE VÍ TIỀN ---
@@ -31,14 +34,14 @@ const LandlordFinance = () => {
   // === 1. LOGIC VÍ & THANH TOÁN ===
   const fetchWalletData = async () => {
     try {
-      // Gọi song song lấy Profile (số dư) và Lịch sử
       const [profileRes, historyRes] = await Promise.all([
         paymentService.getMyWallet(),
         paymentService.getMyHistory()
       ]);
-      
+
       setBalance(profileRes.data.walletBalance);
-      setTransactions(historyRes.data);
+      // Sắp xếp giao dịch mới nhất lên đầu
+      setTransactions((historyRes.data || []).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
     } catch (error) {
       console.error("Lỗi tải dữ liệu ví", error);
     }
@@ -50,10 +53,8 @@ const LandlordFinance = () => {
     }
     setLoadingPay(true);
     try {
-      // Gọi API tạo link VNPay
       const res = await paymentService.createPaymentUrl(depositAmount, user.id);
       if (res.data && res.data.url) {
-        // Chuyển hướng sang trang VNPay
         window.location.href = res.data.url;
       }
     } catch (error) {
@@ -62,6 +63,7 @@ const LandlordFinance = () => {
     }
   };
 
+  // 🟢 CẬP NHẬT CỘT GIAO DỊCH ĐỂ NHẬN DIỆN "ĐẨY TIN"
   const transactionColumns = [
     {
       title: 'Thời gian',
@@ -74,9 +76,26 @@ const LandlordFinance = () => {
       dataIndex: 'type',
       key: 'type',
       render: (type) => {
-        let color = type === 'DEPOSIT' ? 'green' : 'volcano';
-        let text = type === 'DEPOSIT' ? 'Nạp tiền' : 'Phí đăng tin';
-        return <Tag color={color}>{text}</Tag>;
+        let color = 'default';
+        let text = type;
+        let icon = null;
+        
+        if (type === 'DEPOSIT') {
+          color = 'green';
+          text = 'Nạp tiền vào ví';
+        } else if (type === 'PURCHASE_PACKAGE' || type === 'MEMBERSHIP') {
+          color = 'purple';
+          text = 'Mua gói Hội Viên';
+        } else if (type === 'ROOM_PROMOTION' || type === 'PUSH_ROOM') { // 🟢 LOGIC MỚI
+          color = 'blue';
+          text = 'Đẩy tin lên Top';
+          icon = <RocketOutlined className="mr-1"/>;
+        } else if (type === 'DEDUCTION' || type === 'POST_FEE') {
+          color = 'orange';
+          text = 'Phí dịch vụ';
+        }
+
+        return <Tag color={color} className="font-medium flex items-center w-fit">{icon} {text}</Tag>;
       }
     },
     {
@@ -84,7 +103,8 @@ const LandlordFinance = () => {
       dataIndex: 'amount',
       key: 'amount',
       render: (amount) => (
-        <span className={amount > 0 ? "text-green-600 font-bold" : "text-red-600 font-bold"}>
+        <span className={`font-bold ${amount >= 0 ? "text-green-600" : "text-red-600"}`}>
+          {amount > 0 ? '+' : ''}
           {new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount)}
         </span>
       )
@@ -94,21 +114,37 @@ const LandlordFinance = () => {
       dataIndex: 'status',
       key: 'status',
       render: (status) => (
-        <Tag color={status === 'SUCCESS' ? 'success' : 'error'}>
+        <Tag color={status === 'SUCCESS' ? 'success' : 'error'} bordered={false}>
           {status === 'SUCCESS' ? 'Thành công' : 'Thất bại'}
         </Tag>
       )
     }
   ];
 
-  // === 2. LOGIC THÔNG BÁO ===
+  // === 2. LOGIC THÔNG BÁO (ĐÃ CẬP NHẬT) ===
   const fetchNotifications = async () => {
     setLoadingNoti(true);
     try {
       const res = await notificationService.getMyNotifications();
-      setNotifications(res.data);
+      const allData = res.data || [];
+      
+      // 🟢 CẬP NHẬT BỘ LỌC: Thêm các từ khóa liên quan đến Đẩy tin
+      const financialNotis = allData.filter(n => {
+        const type = n.type || '';
+        const title = (n.title || '').toLowerCase();
+        
+        // Danh sách các loại thông báo tài chính
+        const financialTypes = ['BILL_NEW', 'DEPOSIT', 'PAYMENT', 'PURCHASE_PACKAGE', 'DEDUCTION', 'ROOM_PROMOTION', 'PUSH_ROOM'];
+        
+        // Danh sách từ khóa tìm kiếm trong tiêu đề
+        const keywords = ['nạp tiền', 'thanh toán', 'gói vip', 'trừ tiền', 'đẩy tin', 'lên top', 'gia hạn'];
+
+        return financialTypes.includes(type) || keywords.some(k => title.includes(k));
+      });
+
+      setNotifications(financialNotis);
     } catch (error) {
-      console.error("Lỗi tải thông báo", error);
+      console.error("Lỗi tải thông báo tài chính", error);
     } finally {
       setLoadingNoti(false);
     }
@@ -117,8 +153,7 @@ const LandlordFinance = () => {
   const handleMarkRead = async (id) => {
     try {
       await notificationService.markAsRead(id);
-      // Cập nhật lại state local để đổi màu
-      setNotifications(prev => prev.map(n => 
+      setNotifications(prev => prev.map(n =>
         n.id === id ? { ...n, read: true } : n
       ));
     } catch (error) {
@@ -126,39 +161,32 @@ const LandlordFinance = () => {
     }
   };
 
-  // === EFFECTS ===
   useEffect(() => {
     fetchWalletData();
     fetchNotifications();
   }, []);
 
-  // === RENDER ===
   const items = [
     {
       key: '1',
-      label: (
-        <span>
-          <WalletOutlined /> Quản lý Ví & Nạp tiền
-        </span>
-      ),
+      label: (<span><WalletOutlined /> Quản lý Ví & Nạp tiền</span>),
       children: (
         <div className="space-y-6">
-          {/* Card Số dư & Nạp tiền */}
           <Row gutter={16}>
             <Col span={12}>
-              <Card bordered={false} className="bg-blue-50 shadow-sm">
+              <Card bordered={false} className="bg-blue-50 shadow-sm border-l-4 border-blue-500">
                 <Statistic
                   title="Số dư hiện tại"
                   value={balance}
                   precision={0}
-                  valueStyle={{ color: '#3f8600', fontWeight: 'bold' }}
+                  valueStyle={{ color: '#1677ff', fontWeight: 'bold' }}
                   prefix={<WalletOutlined />}
                   suffix="VNĐ"
                 />
               </Card>
             </Col>
             <Col span={12}>
-              <Card title="Nạp tiền vào ví (Qua VNPay)" bordered={false} className="shadow-sm h-full">
+              <Card title="Nạp tiền vào ví (Qua VNPay)" bordered={false} className="shadow-sm">
                 <div className="flex gap-4">
                   <InputNumber
                     className="w-full"
@@ -170,29 +198,29 @@ const LandlordFinance = () => {
                     formatter={value => `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ',')}
                     parser={value => value.replace(/\$\s?|(,*)/g, '')}
                   />
-                  <Button 
-                    type="primary" 
-                    icon={<CreditCardOutlined />} 
+                  <Button
+                    type="primary"
+                    icon={<CreditCardOutlined />}
                     loading={loadingPay}
                     onClick={handleDeposit}
+                    className="bg-blue-600"
                   >
-                    Thanh toán ngay
+                    Thanh toán
                   </Button>
                 </div>
-                <Text type="secondary" className="block mt-2 text-xs">
+                <Text type="secondary" className="block mt-2 text-xs italic">
                   * Hệ thống sẽ chuyển hướng sang cổng thanh toán VNPay.
                 </Text>
               </Card>
             </Col>
           </Row>
 
-          {/* Bảng lịch sử giao dịch */}
-          <Card title={<><HistoryOutlined /> Lịch sử giao dịch</>} className="shadow-sm">
-            <Table 
-              dataSource={transactions} 
-              columns={transactionColumns} 
+          <Card title={<><HistoryOutlined /> Lịch sử biến động số dư</>} className="shadow-sm rounded-xl">
+            <Table
+              dataSource={transactions}
+              columns={transactionColumns}
               rowKey="id"
-              pagination={{ pageSize: 5 }} 
+              pagination={{ pageSize: 6 }}
             />
           </Card>
         </div>
@@ -202,45 +230,57 @@ const LandlordFinance = () => {
       key: '2',
       label: (
         <span>
-          <BellOutlined /> Thông báo <Badge count={notifications.filter(n => !n.read).length} offset={[5, 0]} size="small" />
+          <BellOutlined /> Thông báo tài chính <Badge count={notifications.filter(n => !n.read).length} offset={[5, 0]} size="small" />
         </span>
       ),
       children: (
-        <Card className="shadow-sm">
+        <Card className="shadow-sm rounded-xl">
           <List
             itemLayout="horizontal"
             loading={loadingNoti}
             dataSource={notifications}
-            renderItem={(item) => (
-              <List.Item
-                actions={[
-                  !item.read && (
-                    <Button type="link" size="small" onClick={() => handleMarkRead(item.id)}>
-                      Đã đọc
-                    </Button>
-                  )
-                ]}
-                className={!item.read ? "bg-blue-50 rounded mb-2 px-4" : "px-4"}
-              >
-                <List.Item.Meta
-                  avatar={
-                    <Avatar 
-                        icon={item.type === 'BILL_NEW' ? <DollarOutlined /> : <BellOutlined />} 
-                        style={{ backgroundColor: item.read ? '#ccc' : '#1890ff' }} 
-                    />
-                  }
-                  title={
-                    <div className="flex justify-between">
+            renderItem={(item) => {
+              // 🟢 XÁC ĐỊNH CHIỀU GIAO DỊCH: Đẩy tin (ROOM_PROMOTION) là Chi tiêu (Màu đỏ)
+              const isExpense = ['PURCHASE_PACKAGE', 'DEDUCTION', 'POST_FEE', 'ROOM_PROMOTION', 'PUSH_ROOM'].includes(item.type) 
+                                || (item.title && (item.title.toLowerCase().includes('trừ') || item.title.toLowerCase().includes('thanh toán')));
+              
+              return (
+                <List.Item
+                  actions={[
+                    !item.read && (
+                      <Button type="link" size="small" onClick={() => handleMarkRead(item.id)}>
+                        Đã đọc
+                      </Button>
+                    )
+                  ]}
+                  className={`transition-all ${!item.read ? "bg-blue-50/50" : ""} px-4 rounded-lg mb-2`}
+                >
+                  <List.Item.Meta
+                    avatar={
+                      <Avatar
+                        icon={isExpense ? <ArrowDownOutlined /> : <ArrowUpOutlined />}
+                        style={{ backgroundColor: isExpense ? '#ff4d4f' : '#52c41a' }}
+                      />
+                    }
+                    title={
+                      <div className="flex justify-between">
                         <span className={!item.read ? "font-bold" : ""}>{item.title}</span>
-                        <Text type="secondary" style={{ fontSize: 12 }}>
-                            {dayjs(item.createdAt).fromNow()}
+                        <Text type="secondary" className="text-xs">
+                          {dayjs(item.createdAt).fromNow()}
                         </Text>
-                    </div>
-                  }
-                  description={item.message}
-                />
-              </List.Item>
-            )}
+                      </div>
+                    }
+                    description={
+                        <div>
+                            {item.message}
+                            {/* Nếu là đẩy tin, hiện thêm icon tên lửa cho đẹp */}
+                            {item.type === 'ROOM_PROMOTION' && <Tag color="blue" className="ml-2 text-[10px]"><RocketOutlined/> Đẩy tin</Tag>}
+                        </div>
+                    }
+                  />
+                </List.Item>
+              );
+            }}
           />
         </Card>
       ),
@@ -248,9 +288,18 @@ const LandlordFinance = () => {
   ];
 
   return (
-    <div className="p-2">
-      <Title level={3}>Trung tâm Tài chính & Thông báo</Title>
-      <Tabs defaultActiveKey="1" items={items} onChange={setActiveTab} size="large" />
+    <div className="p-4 bg-gray-50 min-h-screen">
+      <div className="mb-6">
+        <Title level={3} className="m-0 text-blue-800">Trung tâm Tài chính</Title>
+        <Text type="secondary">Theo dõi số dư, nạp tiền và quản lý các giao dịch nâng cấp VIP.</Text>
+      </div>
+      <Tabs 
+        defaultActiveKey="1" 
+        items={items} 
+        onChange={setActiveTab} 
+        size="large" 
+        className="bg-white p-4 rounded-xl shadow-sm"
+      />
     </div>
   );
 };

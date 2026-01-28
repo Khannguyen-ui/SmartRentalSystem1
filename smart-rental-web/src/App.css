@@ -40,3 +40,13 @@
 .read-the-docs {
   color: #888;
 }
+/* Dán vào file CSS của bạn */
+.seamless-upload .ant-upload.ant-upload-select,
+.seamless-upload .ant-upload-list-item-container {
+    width: 64px !important;
+    height: 64px !important;
+    margin: 0 8px 0 0 !important;
+}
+.seamless-upload .ant-upload-list-item {
+    padding: 4px !important;
+}
