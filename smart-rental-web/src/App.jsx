@@ -3,6 +3,7 @@ import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import { ConfigProvider, App as AntApp } from 'antd'; // Import thêm AntApp
 import AppRoutes from './routes/AppRoutes'; 
+import ChatBox from './components/shared/ChatBox';
 
 function App() {
   return (
@@ -10,6 +11,7 @@ function App() {
       <AntApp>
         <BrowserRouter>
            <AppRoutes />
+           <ChatBox />
         </BrowserRouter>
       </AntApp>
     </ConfigProvider>
